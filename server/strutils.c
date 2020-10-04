@@ -1,0 +1,99 @@
+#include "strutils.h"
+
+void check_root_permission() {
+    if (geteuid() != 0) {
+        fprintf(stderr, "Wrong: FTP Server need root permission to work!\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void read_config() {
+    const char filename[] = "config.conf";
+    char line[MAX_LINE_LENGTH_CONFIG] = {0};
+    FILE* pf = NULL;
+    pf = fopen(filename, "r");
+    if (pf == NULL) {
+        fprintf(stderr, "Wrong: Fail to open config file config.conf\n");
+        exit(EXIT_FAILURE);
+    }
+    while (!feof(pf)) {
+        fgets(line, MAX_LINE_LENGTH_CONFIG, pf);
+        int length = strlen(line);
+
+        int all_space_flag = 1;
+        for (int i = 0; i < length; i++) {
+            if (!isspace(line[i])) {
+                all_space_flag = 0;
+                break;
+            }
+        }
+        
+        char* pos = line;
+        while (isspace(*pos)) pos++;
+
+        if (length == 0 || all_space_flag || *pos == '#') continue;
+
+        while (length > 0 && isspace(line[length - 1])) {
+            line[length - 1] = '\0';
+            length--;
+        }
+        
+        char key[128] = { 0 };
+        char value[128] = { 0 };
+        int i = 0;
+        while (*pos != '=') {
+            key[i++] = *pos;
+            pos++;
+        }
+        pos++; i = 0;
+        while (*pos != '\0') {
+            value[i++] = *pos;
+            pos++;
+        }
+        
+        if (strcmp(key, "listen_port") == 0)
+            listen_port = atoi(value);
+        else if (strcmp(key, "listen_address") == 0) {
+            listen_address = strdup(value);
+        }
+        else if (strcmp(key, "root_path") == 0) {
+            root_path = strdup(value);
+        }
+        else {
+            printf("Wrong: has no attribute %s!\n", key);
+        }
+    }
+
+}
+
+
+static const struct option long_options[] = {
+    { "help", 0, NULL, 'h' },
+    { "port", 1, NULL, 'p' },
+    { "root", 1, NULL, 'r' },
+    { NULL, 0, NULL, 0 }
+};
+static const char short_options[] = "p::r::";
+
+void get_paras(int argc, char *argv[]) {
+    int opt = 0;
+    while((opt=getopt_long(argc, argv, short_options, long_options,NULL))!=-1) {
+        switch(opt)
+        {
+            case 0:break;
+            case 'h': {
+                printf("Usage: sudo ./ftpServer --port 12306 --root ./spb/tmp\n");
+                break;
+            }
+            case 'p': {
+                listen_port = atoi(optarg);
+                break;
+            }
+            case 'r': {
+                if (root_path) free(root_path);
+                root_path = strdup(optarg);
+                break;
+            }
+        }
+    }
+}
