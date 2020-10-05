@@ -1,49 +1,49 @@
 #include "netutils.h"
 
+int create_socket(int port)
+{
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        printf("Wrong: fail to open socket!\n");
+        return -1; 
+    }
+
+    struct sockaddr_in sock_addr;
+    sock_addr.sin_family = AF_INET;
+    sock_addr.sin_port = htons(port);
+    sock_addr.sin_addr.s_addr = htonl(INADDR_ANY);        
+
+    int reuse = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(int)) == -1) {
+        close(sockfd);
+        printf("Wrong: fail to set sockopt!\n");
+        return -1; 
+    }
+
+    if (bind(sockfd, (struct sockaddr *) &sock_addr, sizeof(sock_addr)) < 0) {
+        close(sockfd);
+        printf("Wrong: fail to bind!\n");
+        return -1; 
+    }     
+    return sockfd;
+}
+
 int create_ftp_server(const char *host, unsigned short port) {
     if(chroot(root_path) !=0 ) {
        printf("Wrong: cannot find root path!\n");
        exit(EXIT_FAILURE);
     }
-    int listener_d = socket(PF_INET, SOCK_STREAM, 0);
-    if (listener_d < 0) {
-        printf("Wrong: fail to open socket!\n");
+    int sockfd = create_socket(port);
+    if (sockfd < 0) {
+        printf("Wrong: fail to create socket!\n");
         exit(EXIT_FAILURE);
     }
-    struct sockaddr_in server;
-    memset(&server, 0, sizeof(server));
-    server.sin_family = AF_INET;
-    server.sin_port = htons(port);
-    if (host != NULL) {
-        if(inet_aton(host, &server.sin_addr) == 0)
-        {
-            struct hostent *hp;
-            hp = gethostbyname(host);
-            if(hp == NULL) {
-                printf("Wrong: invaild server address!\n");
-                exit(EXIT_FAILURE);
-            }
-            server.sin_addr = *(struct in_addr*)hp->h_addr_list[0];
-        }
-    }
-    else
-        server.sin_addr.s_addr = htonl(INADDR_ANY);
-    
-    int reuse = 1;
-    if((setsockopt(listener_d, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse))) < 0) {
-        printf("Wrong: fail to set sockopt!\n");
-        exit(EXIT_FAILURE);
-    }
-    if(bind(listener_d, (struct sockaddr*)&server, sizeof(server)) < 0) {
-        printf("Wrong: fail to bind!\n");
-        exit(EXIT_FAILURE);
-    }
-    if(listen(listener_d, SOMAXCONN) < 0) {
+    if(listen(sockfd, SOMAXCONN) < 0) {
+        close(sockfd);
         printf("Wrong: fail to listen!\n");
         exit(EXIT_FAILURE);
     }
-
-    return listener_d;
+    return sockfd;
 }
 
 void receive_request(int listener_d) {
@@ -157,11 +157,12 @@ void command_stor(char* args, connection_state* state) {
 }
 
 void command_quit(char* args, connection_state* state) {
-    // TODO
+    //TODO
+    write(state->sockfd, quit_message, sizeof(quit_message));
 }
 
 void command_syst(char* args, connection_state* state) {
-    // TODO
+    write(state->sockfd, syst_message, sizeof(syst_message));
 }
 
 void command_type(char* args, connection_state* state) {
@@ -175,18 +176,45 @@ void command_port(char* args, connection_state* state) {
     }
 }
 
-void generate_random_port(int* port1, int* port2) {
-    srand(time(NULL));
-    *port1 = 128 + (rand() % 64);
-    *port2 = rand() % 0xff;
-}
+// void generate_random_port(int* port1, int* port2) {
+//     srand(time(NULL));
+//     *port1 = 128 + (rand() % 64);
+//     *port2 = rand() % 0xff;
+// }
 
 void command_pasv(char* args, connection_state* state) {
     if (state->logged == 0) {
         write(state->sockfd, need_login_message, sizeof(need_login_message));
         return;
     }
+
+    int port1 = 0, port2 = 0, port;
+    srand(time(NULL));
+    port1 = 128 + (rand() % 64);
+    port2 = rand() % 0xff;
+    // generate_random_port(&port1, &port2);
+    port = 256 * port1 + port2;
+
+    int sockfd = state->sockfd;
+    socklen_t addr_size = sizeof(struct sockaddr_in);
+    struct sockaddr_in addr;
+    if (getsockname(sockfd, (struct sockaddr *)&addr, &addr_size) != 0) {
+        printf("Wrong: unknown error!\n");
+        exit(EXIT_FAILURE);
+    }
+    int ip[4] = { 0 };
+    int host = addr.sin_addr.s_addr;
+    for (int i = 0; i < 4; i++) 
+        ip[i] = (host >> i * 8) & 0xff;
     
+    //close(state->sock_pasv);
+    state->passive_socket = create_socket(port);
+    printf("Passive port: %d\n", state->passive_socket);
+
+    char message[128] = { '\0' };
+    sprintf(message, passive_message, ip[0], ip[1], ip[2], ip[3], port1, port2);
+    write(state->sockfd, message, sizeof(message));
+    printf("%s\n", message);
 }
 
 void command_mkd(char* args, connection_state* state) {
