@@ -69,6 +69,7 @@ void* process_request(void* client_descriptor) {
     connection_state* state = (connection_state*)malloc(sizeof(connection_state));
     state->logged = 0;
     state->sockfd = sockfd;
+    state->mode = NORMAL;
     memset(state->username, '\0', sizeof(char) * USERNAME_LENGTH);
 
     write(sockfd, welcome_message, strlen(welcome_message));
@@ -117,6 +118,7 @@ void process_command(char* command, char* args, connection_state* state) {
         case RMD: command_rmd(args, state); break;
         case RNFR: command_rnfr(args, state); break;
         case RNTO: command_rnto(args, state); break;
+        case ABOR: command_abor(args, state); break;
         default: {
             write(state->sockfd, unknown_command_message, sizeof(unknown_command_message));
             break;
@@ -149,7 +151,44 @@ void command_pass(char* args, connection_state* state) {
 }
 
 void command_retr(char* args, connection_state* state) {
-    // TODO
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_message, sizeof(need_login_message));
+        return;
+    }
+    if (state->mode != PASV) {
+        write(state->sockfd, need_passive_message, sizeof(need_passive_message));
+        return;
+    }
+    struct stat file_info;
+    int send_file_bytes = 0;
+    int file_desc = open(args, O_RDONLY);
+    // TODO: process error
+    if (access(args, R_OK) && file_desc != -1) {
+        write(state->sockfd, open_data_conn_message, sizeof(open_data_conn_message));
+        fstat(file_desc, &file_info);
+        struct sockaddr_in client_address;
+        int address_length = sizeof(struct sockaddr_in);
+        int connection = accept(state->passive_socket, (struct sockaddr*) &client_address, &address_length);
+        if (connection != -1) {
+            off_t offset = 0;
+            send_file_bytes = sendfile(connection, file_desc, &offset, file_info.st_size);
+            if (send_file_bytes != -1 && send_file_bytes == file_info.st_size) {
+                write(state->sockfd, send_file_ok_message, sizeof(send_file_ok_message));
+            }
+            else {
+                write(state->sockfd, network_fail_message, sizeof(network_fail_message));
+            }
+        }
+        else {
+            write(state->sockfd, fail_tcp_conn_message, sizeof(fail_tcp_conn_message));
+        }
+        close(file_desc);
+        close(connection);
+    }
+    else {
+        write(state->sockfd, fail_read_file_message, sizeof(fail_read_file_message));
+        return;
+    }
 }
 
 void command_stor(char* args, connection_state* state) {
@@ -209,6 +248,7 @@ void command_pasv(char* args, connection_state* state) {
     
     //close(state->sock_pasv);
     state->passive_socket = create_socket(port);
+    state->mode = PASSIVE;
     printf("Passive port: %d\n", state->passive_socket);
 
     char message[128] = { '\0' };
@@ -243,4 +283,8 @@ void command_rnfr(char* args, connection_state* state) {
 
 void command_rnto(char* args, connection_state* state) {
     // TODO
+}
+
+void command_abor(char* args, connection_state* state) {
+    command_quit(args, state);
 }

@@ -28,5 +28,6 @@ void command_list(char* args, connection_state* state);
 void command_rmd(char* args, connection_state* state);
 void command_rnfr(char* args, connection_state* state);
 void command_rnto(char* args, connection_state* state);
+void command_abor(char* args, connection_state* state);
 
 #endif
