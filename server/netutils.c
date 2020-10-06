@@ -70,9 +70,10 @@ void* process_request(void* client_descriptor) {
     state->logged = 0;
     state->sockfd = sockfd;
     state->mode = NORMAL;
+    state->rename_from = NULL;
     memset(state->username, '\0', sizeof(char) * USERNAME_LENGTH);
 
-    write(sockfd, welcome_message, strlen(welcome_message));
+    write(sockfd, welcome_msg, strlen(welcome_msg));
     
     int read_bytes = read(sockfd, buffer, BUFFER_LENGTH);
     while (read_bytes > 0 && read_bytes <= BUFFER_LENGTH) {
@@ -119,8 +120,9 @@ void process_command(char* command, char* args, connection_state* state) {
         case RNFR: command_rnfr(args, state); break;
         case RNTO: command_rnto(args, state); break;
         case ABOR: command_abor(args, state); break;
+        case DELE: command_dele(args, state); break;
         default: {
-            write(state->sockfd, unknown_command_message, sizeof(unknown_command_message));
+            write(state->sockfd, unknown_command_msg, sizeof(unknown_command_msg));
             break;
         }
     }
@@ -129,34 +131,38 @@ void process_command(char* command, char* args, connection_state* state) {
 void command_user(char* args, connection_state* state) {
     if (strcmp(args, username) == 0) {
         strcpy(state->username, username);
-        write(state->sockfd, need_password_message, sizeof(need_password_message));
+        write(state->sockfd, need_password_msg, sizeof(need_password_msg));
     }
     else {
-        write(state->sockfd, user_invaild_message, sizeof(user_invaild_message));
+        write(state->sockfd, user_invaild_msg, sizeof(user_invaild_msg));
     }
 }
 
 void command_pass(char* args, connection_state* state) {
+    // TODO
+    write(state->sockfd, login_succeed_msg, sizeof(login_succeed_msg));
+    state->logged = 1;
+    return;
+    
     if (strcmp(state->username, username) != 0) {
-        write(state->sockfd, need_login_message, sizeof(need_login_message));
-        return;
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
     }
-    if (strcmp(args, password) == 0) {
-        write(state->sockfd, login_succeed_message, sizeof(login_succeed_message));
-        state->logged = 1;
+    else if (strcmp(args, password) != 0) {
+        write(state->sockfd, wrong_password_msg, sizeof(wrong_password_msg));
     }
     else {
-        write(state->sockfd, wrong_password_message, sizeof(wrong_password_message));
+        write(state->sockfd, login_succeed_msg, sizeof(login_succeed_msg));
+        state->logged = 1;
     }
 }
 
 void command_retr(char* args, connection_state* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_message, sizeof(need_login_message));
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
     }
     if (state->mode != PASV) {
-        write(state->sockfd, need_passive_message, sizeof(need_passive_message));
+        write(state->sockfd, need_passive_msg, sizeof(need_passive_msg));
         return;
     }
     struct stat file_info;
@@ -164,7 +170,7 @@ void command_retr(char* args, connection_state* state) {
     int file_desc = open(args, O_RDONLY);
     // TODO: process error
     if (access(args, R_OK) && file_desc != -1) {
-        write(state->sockfd, open_data_conn_message, sizeof(open_data_conn_message));
+        write(state->sockfd, open_data_conn_msg, sizeof(open_data_conn_msg));
         fstat(file_desc, &file_info);
         struct sockaddr_in client_address;
         int address_length = sizeof(struct sockaddr_in);
@@ -173,20 +179,20 @@ void command_retr(char* args, connection_state* state) {
             off_t offset = 0;
             send_file_bytes = sendfile(connection, file_desc, &offset, file_info.st_size);
             if (send_file_bytes != -1 && send_file_bytes == file_info.st_size) {
-                write(state->sockfd, send_file_ok_message, sizeof(send_file_ok_message));
+                write(state->sockfd, send_file_ok_msg, sizeof(send_file_ok_msg));
             }
             else {
-                write(state->sockfd, network_fail_message, sizeof(network_fail_message));
+                write(state->sockfd, network_fail_msg, sizeof(network_fail_msg));
             }
         }
         else {
-            write(state->sockfd, fail_tcp_conn_message, sizeof(fail_tcp_conn_message));
+            write(state->sockfd, fail_tcp_conn_msg, sizeof(fail_tcp_conn_msg));
         }
         close(file_desc);
         close(connection);
     }
     else {
-        write(state->sockfd, fail_read_file_message, sizeof(fail_read_file_message));
+        write(state->sockfd, fail_read_file_msg, sizeof(fail_read_file_msg));
         return;
     }
 }
@@ -197,20 +203,25 @@ void command_stor(char* args, connection_state* state) {
 
 void command_quit(char* args, connection_state* state) {
     //TODO
-    write(state->sockfd, quit_message, sizeof(quit_message));
+    write(state->sockfd, quit_msg, sizeof(quit_msg));
 }
 
 void command_syst(char* args, connection_state* state) {
-    write(state->sockfd, syst_message, sizeof(syst_message));
+    write(state->sockfd, syst_msg, sizeof(syst_msg));
 }
 
 void command_type(char* args, connection_state* state) {
-    // TODO
+    if (strcmp(args, "I") == 0) {
+        write(state->sockfd, type_msg, sizeof(type_msg));
+    }
+    else {
+        write(state->sockfd, type_wrong_msg, sizeof(type_wrong_msg));
+    }
 }
 
 void command_port(char* args, connection_state* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_message, sizeof(need_login_message));
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
     }
 }
@@ -223,7 +234,7 @@ void command_port(char* args, connection_state* state) {
 
 void command_pasv(char* args, connection_state* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_message, sizeof(need_login_message));
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
     }
 
@@ -246,13 +257,13 @@ void command_pasv(char* args, connection_state* state) {
     for (int i = 0; i < 4; i++) 
         ip[i] = (host >> i * 8) & 0xff;
     
-    //close(state->sock_pasv);
+    close(state->passive_socket);
     state->passive_socket = create_socket(port);
     state->mode = PASSIVE;
     printf("Passive port: %d\n", state->passive_socket);
 
     char message[128] = { '\0' };
-    sprintf(message, passive_message, ip[0], ip[1], ip[2], ip[3], port1, port2);
+    sprintf(message, passive_msg, ip[0], ip[1], ip[2], ip[3], port1, port2);
     write(state->sockfd, message, sizeof(message));
     printf("%s\n", message);
 }
@@ -262,15 +273,41 @@ void command_mkd(char* args, connection_state* state) {
 }
 
 void command_cwd(char* args, connection_state* state) {
-    // TODO
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
+    if(chdir(args) == 0){
+        write(state->sockfd, change_dir_msg, sizeof(change_dir_msg));
+    }else{
+        write(state->sockfd, fail_chdir_msg, sizeof(fail_chdir_msg));
+    }
 }
 
 void command_pwd(char* args, connection_state* state) {
-    // TODO
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
+    char msg[MSG_LENGTH] = { '\0' };
+    char word_path[PATH_LENGTH] = { '\0' };
+    if (getcwd(word_path, PATH_LENGTH) != NULL) {
+        strcat(msg, "257 \"");
+        strcat(msg, word_path);
+        strcat(msg, "\"\n");
+    }
+    else {
+        strcpy(msg, "550 Failed to get pwd.\r\n");
+    }
+    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_list(char* args, connection_state* state) {
     // TODO
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
 }
 
 void command_rmd(char* args, connection_state* state) {
@@ -278,13 +315,60 @@ void command_rmd(char* args, connection_state* state) {
 }
 
 void command_rnfr(char* args, connection_state* state) {
-    // TODO
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
+    if (access(args, R_OK) == -1) {
+        write(state->sockfd, no_file_msg, sizeof(no_file_msg));
+        return;
+    }
+    if (access(args, W_OK) == -1) {
+        write(state->sockfd, no_permis_msg, sizeof(no_permis_msg));
+        return;
+    }
+    if (state->rename_from) 
+        free(state->rename_from);
+    state->rename_from = (char*)malloc(PATH_LENGTH);
+    strcpy(state->rename_from, args);
+
+    char msg[] = "350 Ready to rename file.\n";
+    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_rnto(char* args, connection_state* state) {
-    // TODO
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
+    char msg[MSG_LENGTH] = { '\0' };
+    if (state->rename_from == NULL) {
+        strcpy(msg, "550 No file is specified.\n");
+    }
+    else if (rename(state->rename_from, args) == -1) {
+        strcpy(msg, "550 Fail to rename file.\n");
+    }
+    else 
+        strcpy(msg, "250 Rename file successfully.\n");
+    free(state->rename_from); state->rename_from = NULL;
+    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_abor(char* args, connection_state* state) {
     command_quit(args, state);
+}
+
+void command_dele(char* args, connection_state* state) {
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
+    char msg[MSG_LENGTH] = { '\0' };
+    if (unlink(args) == 0) {
+        strcpy(msg, "250 Delete file successfully.\n");
+    }
+    else {
+        strcpy(msg, "550 Fail to delete file.\n");
+    }
+    write(state->sockfd, msg, sizeof(msg));
 }

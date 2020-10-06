@@ -25,22 +25,29 @@ extern unsigned int listen_port;
 extern char* listen_address;
 extern char* root_path;
 
-static const char welcome_message[] = "220 Anonymous FTP server ready.\r\n";
-static const char unknown_command_message[] = "500 Unknown command.\r\n";
-static const char need_password_message[] = "331 Guest login ok, send your complete e-mail address as password.\r\n";
-static const char user_invaild_message[] = "530 Invalid username.\r\n";
-static const char need_login_message[] = "530 Need login.\r\n";
-static const char login_succeed_message[] = "230 Login succeed.\r\n";
-static const char wrong_password_message[] = "530 Wrong password.\r\n";
-static const char passive_message[] = "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).\r\n";
-static const char syst_message[] = "215 UNIX Type: L8.\r\n";
-static const char quit_message[] = "221-You have transferred %d bytes in %d files.\n221-Total traffic for this session was %d bytes in %d transfers.\n221-Thank you for using the FTP service on ftp.ssast.org.\r\n221 Goodbye.\r\n";
-static const char need_passive_message[] = "550 Please Use Passive Mode.\r\n";
-static const char open_data_conn_message[] = "150 Read file OK and ready to open data transfer connection.\r\n";
-static const char fail_read_file_message[] = "451 Failed to read file.\r\n";
-static const char send_file_ok_message[] = "226 Send file successfully.\r\n";
-static const char fail_tcp_conn_message[] = "425 Fail to establish TCP connection.\r\n";
-static const char network_fail_message[] = "426 Network terminated.\r\n";
+static const char welcome_msg[] = "220 Anonymous FTP server ready.\n";
+static const char unknown_command_msg[] = "500 Unknown command.\n";
+static const char need_password_msg[] = "331 Guest login ok, send your complete e-mail address as password.\n";
+static const char user_invaild_msg[] = "530 Invalid username.\n";
+static const char need_login_msg[] = "530 Need login.\n";
+static const char login_succeed_msg[] = "230 Login succeed.\n";
+static const char wrong_password_msg[] = "530 Wrong password.\n";
+static const char passive_msg[] = "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).\n";
+static const char syst_msg[] = "215 UNIX Type: L8.\n";
+static const char quit_msg[] = "221-You have transferred %d bytes in %d files.\n221-Total traffic for this session was %d bytes in %d transfers.\n221-Thank you for using the FTP service on ftp.ssast.org.\n221 Goodbye.\n";
+static const char need_passive_msg[] = "550 Please Use Passive Mode.\n";
+static const char open_data_conn_msg[] = "150 Read file OK and ready to open data transfer connection.\n";
+static const char fail_read_file_msg[] = "451 Failed to read file.\n";
+static const char send_file_ok_msg[] = "226 Send file successfully.\n";
+static const char fail_tcp_conn_msg[] = "425 Fail to establish TCP connection.\n";
+static const char network_fail_msg[] = "426 Network terminated.\n";
+static const char type_msg[] = "200 Type set to I.\n";
+static const char type_wrong_msg[] = "503 Wrong type.\n";
+static const char change_dir_msg[] = "250 Change directory successfully.\n";
+static const char fail_chdir_msg[] = "550 Fail to change directory.\n";
+
+static const char no_file_msg[] = "550 No such file or directory.\n";
+static const char no_permis_msg[] = "550 Permission denied.\n";
 
 static const char username[] = "anonymous";
 static const char password[] = "password";
@@ -50,16 +57,18 @@ static const char password[] = "password";
 #define ARGS_LENGTH 128
 #define WELCOME_LENGTH 128
 #define USERNAME_LENGTH 32
+#define PATH_LENGTH 256
+#define MSG_LENGTH 512
 
 typedef enum cmdlist { 
     USER, PASS, RETR, STOR, QUIT, SYST, TYPE, PORT, PASV,
-    MKD, CWD, PWD, LIST, RMD, RNFR, RNTO, ABOR
+    MKD, CWD, PWD, LIST, RMD, RNFR, RNTO, ABOR, DELE
 } cmdlist;
 
 static const char *cmdlist_str[] = 
 {
     "USER", "PASS", "RETR", "STOR", "QUIT", "SYST", "TYPE", "PORT", "PASV",
-    "MKD", "CWD", "PWD", "LIST", "RMD", "RNFR", "RNTO", "ABOR"
+    "MKD", "CWD", "PWD", "LIST", "RMD", "RNFR", "RNTO", "ABOR", "DELE"
 };
 
 typedef enum conn_mode { 
@@ -72,6 +81,7 @@ typedef struct connection_state {
     int sockfd;
     int passive_socket;
     conn_mode mode;
+    char* rename_from;
 } connection_state;
 
 #endif
