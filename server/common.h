@@ -78,6 +78,9 @@ typedef struct Session {
     SessionMode mode;
     char* rename_from;
     struct sockaddr_in *port_addr;
+    int is_trans_data;
 } Session;
+
+void send_message(Session* state, const char* msg);
 
 #endif
