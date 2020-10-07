@@ -66,7 +66,7 @@ void* process_request(void* client_descriptor) {
     char args[ARGS_LENGTH] = {'\0'};
     char buffer[BUFFER_LENGTH] = {'\0'};
 
-    connection_state* state = (connection_state*)malloc(sizeof(connection_state));
+    Session* state = (Session*)malloc(sizeof(Session));
     state->logged = 0;
     state->sockfd = sockfd;
     state->mode = NORMAL;
@@ -93,7 +93,7 @@ void* process_request(void* client_descriptor) {
     return NULL;
 }
 
-void process_command(char* command, char* args, connection_state* state) {
+void process_command(char* command, char* args, Session* state) {
     int cmdlist_count = sizeof(cmdlist_str) / sizeof(char *);
     int command_index = -1;
     for (int i = 0; i < cmdlist_count; i++) {
@@ -121,6 +121,7 @@ void process_command(char* command, char* args, connection_state* state) {
         case RNTO: command_rnto(args, state); break;
         case ABOR: command_abor(args, state); break;
         case DELE: command_dele(args, state); break;
+        case CDUP: command_cdup(args, state); break;
         default: {
             write(state->sockfd, unknown_command_msg, sizeof(unknown_command_msg));
             break;
@@ -128,41 +129,52 @@ void process_command(char* command, char* args, connection_state* state) {
     }
 }
 
-void command_user(char* args, connection_state* state) {
-    if (strcmp(args, username) == 0) {
-        strcpy(state->username, username);
-        write(state->sockfd, need_password_msg, sizeof(need_password_msg));
+void command_user(char* args, Session* state) {
+    char msg[MSG_LENGTH] = { '\0' };
+    if (state->logged == 1) {
+        strcpy(msg, "230 Already logged-in.\n");
+    }
+    else if (strcmp(args, username) != 0) {
+        strcpy(msg, "530 Invalid username.\n");
     }
     else {
-        write(state->sockfd, user_invaild_msg, sizeof(user_invaild_msg));
+        strcpy(state->username, username);
+        strcpy(msg, "331 Guest login okay, send your complete e-mail address as password.\n");
     }
+    write(state->sockfd, msg, sizeof(msg));
 }
 
-void command_pass(char* args, connection_state* state) {
+void command_pass(char* args, Session* state) {
     // TODO
     write(state->sockfd, login_succeed_msg, sizeof(login_succeed_msg));
     state->logged = 1;
     return;
-    
-    if (strcmp(state->username, username) != 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+
+    char msg[MSG_LENGTH] = { '\0' };
+    if (state->logged == 1) {
+        strcpy(msg, "202 Already logged in.\n");
+    }
+    else if (strcmp(state->username, username) != 0) {
+        strcpy(msg, "503 Login with USER first.\n");
     }
     else if (strcmp(args, password) != 0) {
-        write(state->sockfd, wrong_password_msg, sizeof(wrong_password_msg));
+        strcpy(msg, "530 Authentication failed.\n");
     }
     else {
-        write(state->sockfd, login_succeed_msg, sizeof(login_succeed_msg));
+        strcpy(msg, "230 User logged in, proceed.\n");
         state->logged = 1;
     }
+    write(state->sockfd, msg, sizeof(msg));
 }
 
-void command_retr(char* args, connection_state* state) {
+void command_retr(char* args, Session* state) {
     if (state->logged == 0) {
         write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
     }
     if (state->mode != PASV) {
-        write(state->sockfd, need_passive_msg, sizeof(need_passive_msg));
+        char msg[] = "550 Please Use Passive Mode.\n";
+        write(state->sockfd, msg, sizeof(msg));
         return;
     }
     struct stat file_info;
@@ -197,33 +209,63 @@ void command_retr(char* args, connection_state* state) {
     }
 }
 
-void command_stor(char* args, connection_state* state) {
+void command_stor(char* args, Session* state) {
     // TODO
 }
 
-void command_quit(char* args, connection_state* state) {
+void command_quit(char* args, Session* state) {
     //TODO
-    write(state->sockfd, quit_msg, sizeof(quit_msg));
+    char msg[] = "221-You have transferred %d bytes in %d files.\n"\
+                "221-Total traffic for this session was %d bytes in %d transfers.\n"\
+                "221-Thank you for using the FTP service on ftp.ssast.org.\n"\
+                "221 Goodbye.\n";
+    write(state->sockfd, msg, sizeof(msg));
 }
 
-void command_syst(char* args, connection_state* state) {
-    write(state->sockfd, syst_msg, sizeof(syst_msg));
+void command_syst(char* args, Session* state) {
+    char msg[] = "215 UNIX Type: L8.\n";
+    write(state->sockfd, msg, sizeof(msg));
 }
 
-void command_type(char* args, connection_state* state) {
-    if (strcmp(args, "I") == 0) {
-        write(state->sockfd, type_msg, sizeof(type_msg));
-    }
-    else {
-        write(state->sockfd, type_wrong_msg, sizeof(type_wrong_msg));
-    }
-}
-
-void command_port(char* args, connection_state* state) {
+void command_type(char* args, Session* state) {
     if (state->logged == 0) {
         write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
     }
+    char msg[MSG_LENGTH] = { '\0' };
+    if(strcmp(args, "I") != 0) {
+        strcpy(msg, "503 Wrong type.\n");
+    }
+    else {
+        strcpy(msg, "200 Type set to I.\n");
+    }
+    write(state->sockfd, msg, sizeof(msg));
+}
+
+void command_port(char* args, Session* state) {
+    // TODO
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
+    unsigned int ip[4] = { 0 };
+    unsigned int port1 = 0, port2 = 0;
+    sscanf(args, "%u,%u,%u,%u,%u,%u", &ip[0], &ip[1], &ip[2], &ip[3], &port1, &port2);
+
+    struct sockaddr_in *port_addr = (struct sockaddr_in *)malloc(sizeof (struct sockaddr_in));
+    memset(port_addr, 0, sizeof(port_addr));
+    port_addr->sin_family = AF_INET;
+
+    char* p = (char*)&port_addr->sin_addr.s_addr;
+    p[0] = ip[0]; p[1] = ip[1]; p[2] = ip[2]; p[3] = ip[3];
+    p = (char*)&port_addr->sin_port;
+    p[0] = port1; p[1] = port2;
+
+    state->port_addr = port_addr;
+    state->mode = PORT;
+
+    char msg[] = "200 Command PORT okay.\n";
+    write(state->sockfd, msg, sizeof(msg));
 }
 
 // void generate_random_port(int* port1, int* port2) {
@@ -232,7 +274,7 @@ void command_port(char* args, connection_state* state) {
 //     *port2 = rand() % 0xff;
 // }
 
-void command_pasv(char* args, connection_state* state) {
+void command_pasv(char* args, Session* state) {
     if (state->logged == 0) {
         write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
@@ -268,23 +310,42 @@ void command_pasv(char* args, connection_state* state) {
     printf("%s\n", message);
 }
 
-void command_mkd(char* args, connection_state* state) {
-    // TODO
-}
-
-void command_cwd(char* args, connection_state* state) {
+void command_mkd(char* args, Session* state) {
     if (state->logged == 0) {
         write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
     }
-    if(chdir(args) == 0){
-        write(state->sockfd, change_dir_msg, sizeof(change_dir_msg));
-    }else{
-        write(state->sockfd, fail_chdir_msg, sizeof(fail_chdir_msg));
+    char msg[MSG_LENGTH] = { '\0' };
+    if (access(args, F_OK) == 0) {
+        strcpy(msg, "550 Folder already exists.\n");
     }
+    else if (mkdir(args, 0777) == -1) {
+        strcpy(msg, "550 Fail to create directory.\n");
+    }
+    else {
+        strcpy(msg, "257 Create directory \"");
+        strcat(msg, args);
+        strcat(msg, "\" successfully.\n");
+    }
+    write(state->sockfd, msg, sizeof(msg));
 }
 
-void command_pwd(char* args, connection_state* state) {
+void command_cwd(char* args, Session* state) {
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
+    char msg[MSG_LENGTH] = { '\0' };
+    if(chdir(args) == -1) {
+        strcpy(msg, "550 No such directory.\n");
+    }
+    else {
+        strcpy(msg, "250 Change directory successfully.\n");
+    }
+    write(state->sockfd, msg, sizeof(msg));
+}
+
+void command_pwd(char* args, Session* state) {
     if (state->logged == 0) {
         write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
@@ -302,19 +363,52 @@ void command_pwd(char* args, connection_state* state) {
     write(state->sockfd, msg, sizeof(msg));
 }
 
-void command_list(char* args, connection_state* state) {
+void command_list(char* args, Session* state) {
     // TODO
     if (state->logged == 0) {
         write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
     }
+    if (state->mode == NORMAL) {
+        char msg[] = "425 Need PORT or PASV mode.\n";
+        write(state->sockfd, msg, sizeof(msg));
+        return;
+    }
 }
 
-void command_rmd(char* args, connection_state* state) {
+static int rmFiles(const char *pathname, const struct stat *sbuf, int type, struct FTW *ftwb)
+{
+    if(remove(pathname) < 0)
+    {
+        perror("ERROR: remove");
+        return -1;
+    }
+    return 0;
+}
+
+void command_rmd(char* args, Session* state) {
     // TODO
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
+    struct stat st;
+    stat(args, &st);
+    char msg[MSG_LENGTH] = { '\0' };
+    if (access(args, F_OK) == -1 || !S_ISDIR(st.st_mode)) {
+        strcpy(msg, "550 Not a valid directory.\n");
+    }
+    else if (nftw(args, rmFiles, 10, FTW_DEPTH | FTW_MOUNT | FTW_PHYS) < 0) {
+        perror("ERROR: ntfw");
+        exit(1);
+    }
+    else {
+        strcpy(msg, "250 Directory removed.\n");
+    }
+    write(state->sockfd, msg, sizeof(msg));
 }
 
-void command_rnfr(char* args, connection_state* state) {
+void command_rnfr(char* args, Session* state) {
     if (state->logged == 0) {
         write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
@@ -336,7 +430,7 @@ void command_rnfr(char* args, connection_state* state) {
     write(state->sockfd, msg, sizeof(msg));
 }
 
-void command_rnto(char* args, connection_state* state) {
+void command_rnto(char* args, Session* state) {
     if (state->logged == 0) {
         write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
@@ -354,11 +448,11 @@ void command_rnto(char* args, connection_state* state) {
     write(state->sockfd, msg, sizeof(msg));
 }
 
-void command_abor(char* args, connection_state* state) {
+void command_abor(char* args, Session* state) {
     command_quit(args, state);
 }
 
-void command_dele(char* args, connection_state* state) {
+void command_dele(char* args, Session* state) {
     if (state->logged == 0) {
         write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
@@ -369,6 +463,21 @@ void command_dele(char* args, connection_state* state) {
     }
     else {
         strcpy(msg, "550 Fail to delete file.\n");
+    }
+    write(state->sockfd, msg, sizeof(msg));
+}
+
+void command_cdup(char* args, Session* state) {
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
+    char msg[MSG_LENGTH] = { '\0' };
+    if(chdir("..") == -1) {
+        strcpy(msg, "550 Fail to change directory.\n");
+    }
+    else {
+        strcpy(msg, "250 Change directory successfully.\n");
     }
     write(state->sockfd, msg, sizeof(msg));
 }
