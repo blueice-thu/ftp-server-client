@@ -5,5 +5,5 @@ char* listen_address = NULL;
 char* root_path = NULL;
 
 void send_message(Session* state, const char* msg) {
-    write(state->sockfd, msg, sizeof(msg));
+    write(state->sockfd, msg, strlen(msg));
 }

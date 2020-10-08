@@ -21,6 +21,8 @@
 #include <getopt.h>
 #include <fcntl.h>
 #include <ftw.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 extern unsigned int listen_port;
 extern char* listen_address;
@@ -78,6 +80,7 @@ typedef struct Session {
     SessionMode mode;
     char* rename_from;
     struct sockaddr_in *port_addr;
+    int data_trans_fd;
     int is_trans_data;
 } Session;
 

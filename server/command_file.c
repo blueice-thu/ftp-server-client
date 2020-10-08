@@ -64,6 +64,33 @@ void command_list(char* args, Session* state) {
         write(state->sockfd, msg, sizeof(msg));
         return;
     }
+    else if (state->mode == ACTIVE) {
+        DIR* dir_ptr;
+        struct dirent *direntp;
+        if ((dir_ptr = opendir(".")) == NULL) {
+            send_message(state, "551 File listing failed.\n");
+            return ;
+        }
+        else {
+            send_message(state, "150 Opening data connection.\n");
+            while((direntp = readdir(dir_ptr)) != NULL) {
+                if(strcmp(direntp->d_name, ".") != 0 && strcmp(direntp->d_name, "..") != 0) {
+                    strcat(direntp->d_name, " ");
+                    send(state->data_trans_fd, direntp->d_name, strlen(direntp->d_name), 0);
+                }
+            }
+            closedir(dir_ptr);
+        }
+        close(state->data_trans_fd);
+        send_message(state, "226 Closing data connection.\n");
+    }
+    else if (state->mode == PASSIVE) {
+        //TODO
+    }
+    else {
+        printf("Wrong: mode!\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 static int rmFiles(const char *pathname, const struct stat *sbuf, int type, struct FTW *ftwb)

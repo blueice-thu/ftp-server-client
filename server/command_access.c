@@ -1,18 +1,21 @@
 #include "command_access.h"
 
 void command_user(char* args, Session* state) {
-    char msg[MSG_LENGTH] = { '\0' };
+    // TODO
+    strcpy(state->username, username);
+    send_message(state, "331 Guest login okay, send your complete e-mail address as password.\n");
+    return;
+
     if (state->logged == 1) {
-        strcpy(msg, "230 Already logged-in.\n");
+        send_message(state, "230 Already logged-in.\n");
     }
     else if (strcmp(args, username) != 0) {
-        strcpy(msg, "530 Invalid username.\n");
+        send_message(state, "530 Invalid username.\n");
     }
     else {
         strcpy(state->username, username);
-        strcpy(msg, "331 Guest login okay, send your complete e-mail address as password.\n");
+        send_message(state, "331 Guest login okay, send your complete e-mail address as password.\n");
     }
-    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_pass(char* args, Session* state) {

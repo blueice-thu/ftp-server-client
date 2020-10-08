@@ -28,17 +28,25 @@ void command_port(char* args, Session* state) {
     struct sockaddr_in *port_addr = (struct sockaddr_in *)malloc(sizeof (struct sockaddr_in));
     memset(port_addr, 0, sizeof(port_addr));
     port_addr->sin_family = AF_INET;
-
-    char* p = (char*)&port_addr->sin_addr.s_addr;
-    p[0] = ip[0]; p[1] = ip[1]; p[2] = ip[2]; p[3] = ip[3];
-    p = (char*)&port_addr->sin_port;
-    p[0] = port1; p[1] = port2;
-
+    
+    char ip_decimal[40];
+    sprintf(ip_decimal, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    port_addr->sin_addr.s_addr=inet_addr(ip_decimal);
+    int port_dec = port1 * 256 + port2;
+    port_addr->sin_port = htons(port_dec);
     state->port_addr = port_addr;
-    state->mode = PORT;
 
-    char msg[] = "200 Command PORT okay.\n";
-    write(state->sockfd, msg, sizeof(msg));
+    state->data_trans_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (connect(state->data_trans_fd, (struct sockaddr *)(state->port_addr), sizeof(struct sockaddr)) != 0) {
+        printf("Try to connect %s %d.\n", inet_ntoa(port_addr->sin_addr), ntohs(port_addr->sin_port));
+        send_message(state, "425 Fail to establish connection.\n");
+        close(state->data_trans_fd);
+    }
+    else {
+        state->mode = ACTIVE;
+        send_message(state, "200 Command PORT okay.\n");
+    }
 }
 
 // void generate_random_port(int* port1, int* port2) {
@@ -48,10 +56,10 @@ void command_port(char* args, Session* state) {
 // }
 
 void command_pasv(char* args, Session* state) {
-    // if (state->logged == 0) {
-    //     write(state->sockfd, need_login_msg, sizeof(need_login_msg));
-    //     return;
-    // }
+    if (state->logged == 0) {
+        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        return;
+    }
 
     // int port1 = 0, port2 = 0, port;
     // srand(time(NULL));
