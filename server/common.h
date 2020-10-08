@@ -56,6 +56,7 @@ static const char password[] = "password";
 #define USERNAME_LENGTH 32
 #define PATH_LENGTH 256
 #define MSG_LENGTH 512
+#define DATA_BUFFER 128
 
 typedef enum cmdlist { 
     USER, PASS, RETR, STOR, QUIT, SYST, TYPE, PORT, PASV,
