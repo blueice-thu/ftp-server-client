@@ -1,11 +1,10 @@
 #include "common.h"
 
-// unsigned int listen_port = 21;
-// char* listen_address = NULL;
-// char* root_path = NULL;
-
 void send_message(Session* state, const char* msg) {
-    write(state->sockfd, msg, strlen(msg));
+    int bytes = strlen(msg);
+    state->trans_all_bytes += bytes;
+    state->trans_all_num += 1;
+    write(state->sockfd, msg, bytes);
 }
 
 int create_socket(int port, Session* state)

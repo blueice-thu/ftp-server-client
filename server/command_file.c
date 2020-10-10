@@ -2,66 +2,64 @@
 
 void command_mkd(char* args, Session* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
-    char msg[MSG_LENGTH] = { '\0' };
     if (access(args, F_OK) == 0) {
-        strcpy(msg, "550 Folder already exists.\n");
+        send_message(state, "550 Folder already exists.\n");
     }
     else if (mkdir(args, 0777) == -1) {
-        strcpy(msg, "550 Fail to create directory.\n");
+        send_message(state, "550 Fail to create directory.\n");
     }
     else {
+        char msg[MSG_LENGTH] = { '\0' };
         strcpy(msg, "257 Create directory \"");
         strcat(msg, args);
         strcat(msg, "\" successfully.\n");
+        send_message(state, msg);
     }
-    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_cwd(char* args, Session* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
-    char msg[MSG_LENGTH] = { '\0' };
     if(chdir(args) == -1) {
-        strcpy(msg, "550 No such directory.\n");
+        send_message(state, "550 No such directory.\n");
     }
     else {
-        strcpy(msg, "250 Change directory successfully.\n");
+        send_message(state, "250 Change directory successfully.\n");
     }
-    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_pwd(char* args, Session* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
-    char msg[MSG_LENGTH] = { '\0' };
+    
     char word_path[PATH_LENGTH] = { '\0' };
     if (getcwd(word_path, PATH_LENGTH) != NULL) {
+        char msg[MSG_LENGTH] = { '\0' };
         strcat(msg, "257 \"");
         strcat(msg, word_path);
         strcat(msg, "\"\n");
+        send_message(state, need_login_msg);
     }
     else {
-        strcpy(msg, "550 Failed to get pwd.\r\n");
+        send_message(state, "550 Failed to get pwd.\r\n");
     }
-    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_list(char* args, Session* state) {
     // TODO
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
     if (state->mode == NORMAL) {
-        char msg[] = "425 Need PORT or PASV mode.\n";
-        write(state->sockfd, msg, sizeof(msg));
+        send_message(state, "425 Need PORT or PASV mode.\n");
         return;
     }
     else if (state->mode == ACTIVE || state->mode == PASSIVE) {
@@ -106,36 +104,35 @@ static int rmFiles(const char *pathname, const struct stat *sbuf, int type, stru
 void command_rmd(char* args, Session* state) {
     // TODO
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
     struct stat st;
     stat(args, &st);
     char msg[MSG_LENGTH] = { '\0' };
     if (access(args, F_OK) == -1 || !S_ISDIR(st.st_mode)) {
-        strcpy(msg, "550 Not a valid directory.\n");
+        send_message(state, "550 Not a valid directory.\n");
     }
     else if (nftw(args, rmFiles, 10, FTW_DEPTH | FTW_MOUNT | FTW_PHYS) < 0) {
         perror("ERROR: ntfw");
         exit(1);
     }
     else {
-        strcpy(msg, "250 Directory removed.\n");
+        send_message(state, "250 Directory removed.\n");
     }
-    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_rnfr(char* args, Session* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
     if (access(args, R_OK) == -1) {
-        write(state->sockfd, no_file_msg, sizeof(no_file_msg));
+        send_message(state, no_file_msg);
         return;
     }
     if (access(args, W_OK) == -1) {
-        write(state->sockfd, no_permis_msg, sizeof(no_permis_msg));
+        send_message(state, no_permis_msg);
         return;
     }
     if (state->rename_from) 
@@ -143,54 +140,47 @@ void command_rnfr(char* args, Session* state) {
     state->rename_from = (char*)malloc(PATH_LENGTH);
     strcpy(state->rename_from, args);
 
-    char msg[] = "350 Ready to rename file.\n";
-    write(state->sockfd, msg, sizeof(msg));
+    send_message(state, "350 Ready to rename file.\n");
 }
 
 void command_rnto(char* args, Session* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
-    char msg[MSG_LENGTH] = { '\0' };
     if (state->rename_from == NULL) {
-        strcpy(msg, "550 No file is specified.\n");
+        send_message(state, "550 No file is specified.\n");
     }
     else if (rename(state->rename_from, args) == -1) {
-        strcpy(msg, "550 Fail to rename file.\n");
+        send_message(state, "550 Fail to rename file.\n");
     }
     else 
-        strcpy(msg, "250 Rename file successfully.\n");
+        send_message(state, "250 Rename file successfully.\n");
     free(state->rename_from); state->rename_from = NULL;
-    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_dele(char* args, Session* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
-    char msg[MSG_LENGTH] = { '\0' };
     if (unlink(args) == 0) {
-        strcpy(msg, "250 Delete file successfully.\n");
+        send_message(state, "250 Delete file successfully.\n");
     }
     else {
-        strcpy(msg, "550 Fail to delete file.\n");
+        send_message(state, "550 Fail to delete file.\n");
     }
-    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_cdup(char* args, Session* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
-    char msg[MSG_LENGTH] = { '\0' };
     if(chdir("..") == -1) {
-        strcpy(msg, "550 Fail to change directory.\n");
+        send_message(state, "550 Fail to change directory.\n");
     }
     else {
-        strcpy(msg, "250 Change directory successfully.\n");
+        send_message(state, "250 Change directory successfully.\n");
     }
-    write(state->sockfd, msg, sizeof(msg));
 }

@@ -34,7 +34,7 @@ void* process_request(void* client_descriptor) {
     memset(state, 0, sizeof(state));
     state->sockfd = sockfd;
 
-    write(sockfd, welcome_msg, strlen(welcome_msg));
+    send_message(state, welcome_msg);
     
     int read_bytes = read(sockfd, buffer, BUFFER_LENGTH);
     while (read_bytes > 0 && read_bytes <= BUFFER_LENGTH) {
@@ -85,7 +85,7 @@ void process_command(char* command, char* args, Session* state) {
         case DELE: command_dele(args, state); break;
         case CDUP: command_cdup(args, state); break;
         default: {
-            write(state->sockfd, unknown_command_msg, sizeof(unknown_command_msg));
+            send_message(state, unknown_command_msg);
             break;
         }
     }

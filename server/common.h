@@ -88,6 +88,11 @@ typedef struct Session {
     struct sockaddr_in *port_addr;
     int data_trans_fd;
     int is_trans_data;
+    
+    int trans_file_num;
+    int trans_file_bytes;
+    int trans_all_num;
+    int trans_all_bytes;
 } Session;
 
 void send_message(Session* state, const char* msg);

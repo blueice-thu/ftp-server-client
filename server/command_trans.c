@@ -21,10 +21,13 @@ void command_retr(char* args, Session* state) {
         }
         else {
             send_message(state, "150 Opening data connection.\n");
+
             char buffer[BUFFER_LENGTH];
+            state->trans_file_num += 1;
             while (!feof(fp)) {
                 fgets(buffer, DATA_BUFFER, fp);
-                send(state->data_trans_fd, buffer, strlen(buffer), 0);
+                int bytes = send(state->data_trans_fd, buffer, strlen(buffer), 0);
+                state->trans_file_bytes += bytes;
             }
             fclose(fp);
             send_message(state, "226 Transfer complete.\n");

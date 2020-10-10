@@ -2,23 +2,21 @@
 
 void command_type(char* args, Session* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
-    char msg[MSG_LENGTH] = { '\0' };
     if(strcmp(args, "I") != 0) {
-        strcpy(msg, "503 Wrong type.\n");
+        send_message(state, "503 Wrong type.\n");
     }
     else {
-        strcpy(msg, "200 Type set to I.\n");
+        send_message(state, "200 Type set to I.\n");
     }
-    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_port(char* args, Session* state) {
     // TODO
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
     unsigned int ip[4] = { 0 };
@@ -51,7 +49,7 @@ void command_port(char* args, Session* state) {
 
 void command_pasv(char* args, Session* state) {
     if (state->logged == 0) {
-        write(state->sockfd, need_login_msg, sizeof(need_login_msg));
+        send_message(state, need_login_msg);
         return;
     }
     printf("command_pasv begin\n");

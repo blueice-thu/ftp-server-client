@@ -20,39 +20,39 @@ void command_user(char* args, Session* state) {
 
 void command_pass(char* args, Session* state) {
     // TODO
-    write(state->sockfd, login_succeed_msg, sizeof(login_succeed_msg));
+    send_message(state, login_succeed_msg);
     state->logged = 1;
     return;
 
-    char msg[MSG_LENGTH] = { '\0' };
     if (state->logged == 1) {
-        strcpy(msg, "202 Already logged in.\n");
+        send_message(state, "202 Already logged in.\n");
     }
     else if (strcmp(state->username, username) != 0) {
-        strcpy(msg, "503 Login with USER first.\n");
+        send_message(state, "503 Login with USER first.\n");
     }
     else if (strcmp(args, password) != 0) {
-        strcpy(msg, "530 Authentication failed.\n");
+        send_message(state, "530 Authentication failed.\n");
     }
     else {
-        strcpy(msg, "230 User logged in, proceed.\n");
+        send_message(state, "230 User logged in, proceed.\n");
         state->logged = 1;
     }
-    write(state->sockfd, msg, sizeof(msg));
 }
 
 void command_quit(char* args, Session* state) {
     //TODO
-    char msg[] = "221-You have transferred %d bytes in %d files.\n"\
+    char quit_msg[] = "221-You have transferred %d bytes in %d files.\n"\
                 "221-Total traffic for this session was %d bytes in %d transfers.\n"\
                 "221-Thank you for using the FTP service on ftp.ssast.org.\n"\
                 "221 Goodbye.\n";
-    write(state->sockfd, msg, sizeof(msg));
+    char msg[MSG_LENGTH] = { '\0' };
+    sprintf(msg, quit_msg, state->trans_file_bytes, state->trans_file_num, state->trans_all_bytes, state->trans_all_num);
+    send_message(state, msg);
 }
 
 void command_syst(char* args, Session* state) {
-    char msg[] = "215 UNIX Type: L8.\n";
-    write(state->sockfd, msg, sizeof(msg));
+    //TODO
+    send_message(state, "215 UNIX Type: L8.\n");
 }
 
 void command_abor(char* args, Session* state) {
