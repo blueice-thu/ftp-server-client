@@ -7,7 +7,7 @@ void check_root_permission() {
     }
 }
 
-void read_config() {
+void read_config(Config* config) {
     const char filename[] = "config.conf";
     char line[MAX_LINE_LENGTH_CONFIG] = {0};
     FILE* pf = NULL;
@@ -52,12 +52,12 @@ void read_config() {
         }
         
         if (strcmp(key, "listen_port") == 0)
-            listen_port = atoi(value);
+            config->listen_port = atoi(value);
         else if (strcmp(key, "listen_address") == 0) {
-            listen_address = strdup(value);
+            config->listen_address = strdup(value);
         }
         else if (strcmp(key, "root_path") == 0) {
-            root_path = strdup(value);
+            config->root_path = strdup(value);
         }
         else {
             printf("Wrong: has no attribute %s!\n", key);
@@ -75,7 +75,7 @@ static const struct option long_options[] = {
 };
 static const char short_options[] = "p::r::";
 
-void get_paras(int argc, char *argv[]) {
+void get_paras(int argc, char *argv[], Config* config) {
     int opt = 0;
     while((opt=getopt_long(argc, argv, short_options, long_options,NULL))!=-1) {
         switch(opt)
@@ -86,12 +86,12 @@ void get_paras(int argc, char *argv[]) {
                 break;
             }
             case 'p': {
-                listen_port = atoi(optarg);
+                config->listen_port = atoi(optarg);
                 break;
             }
             case 'r': {
-                if (root_path) free(root_path);
-                root_path = strdup(optarg);
+                if (config->root_path) free(config->root_path);
+                config->root_path = strdup(optarg);
                 break;
             }
         }

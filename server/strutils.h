@@ -9,9 +9,9 @@
 void check_root_permission();
 
 // Read parament configs from config.conf
-void read_config();
+void read_config(Config* config);
 
 // Read paraments from opts
-void get_paras(int argc, char *argv[]);
+void get_paras(int argc, char *argv[], Config* config);
 
 #endif

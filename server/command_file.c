@@ -73,12 +73,7 @@ void command_list(char* args, Session* state) {
         }
         else {
             if (state->mode == PASSIVE) {
-                if (state->data_trans_fd > 2)
-                    close(state->data_trans_fd);
-                struct sockaddr_in client_address;
-                int addrlen = sizeof(client_address);
-                state->data_trans_fd = accept(state->passive_socket, (struct sockaddr*) &client_address, &addrlen);
-                close(state->passive_socket);
+                state->data_trans_fd = accept(state->passive_socket, NULL, NULL);
             }
             send_message(state, "150 Opening data connection.\n");
             while((direntp = readdir(dir_ptr)) != NULL) {
@@ -89,7 +84,7 @@ void command_list(char* args, Session* state) {
             }
             closedir(dir_ptr);
         }
-        close(state->data_trans_fd);
+        close_trans_conn(state);
         send_message(state, "226 Closing data connection.\n");
     }
     else {

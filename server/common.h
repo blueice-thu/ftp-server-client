@@ -26,10 +26,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-extern unsigned int listen_port;
-extern char* listen_address;
-extern char* root_path;
-
 static const char welcome_msg[] = "220 Anonymous FTP server ready.\n";
 static const char unknown_command_msg[] = "500 Unknown command.\n";
 static const char need_password_msg[] = "331 Guest login ok, send your complete e-mail address as password.\n";
@@ -60,6 +56,12 @@ static const char password[] = "password";
 #define MSG_LENGTH 512
 #define DATA_BUFFER 128
 
+typedef struct Config {
+    unsigned int listen_port;
+    char* listen_address;
+    char* root_path;
+} Config;
+
 typedef enum cmdlist { 
     USER, PASS, RETR, STOR, QUIT, SYST, TYPE, PORT, PASV,
     MKD, CWD, PWD, LIST, RMD, RNFR, RNTO, ABOR, DELE, CDUP
@@ -79,6 +81,7 @@ typedef struct Session {
     char username[USERNAME_LENGTH];
     int logged; // Login status
     int sockfd;
+    struct sockaddr_in* sock_addr;
     int passive_socket;
     SessionMode mode;
     char* rename_from;
@@ -89,6 +92,10 @@ typedef struct Session {
 
 void send_message(Session* state, const char* msg);
 
-int create_socket(int port);
+int create_socket(int port, Session* state);
+
+void get_local_ip(int sockfd, int* ip);
+
+void close_trans_conn(Session* state);
 
 #endif

@@ -1,12 +1,12 @@
 #include "netutils.h"
 
 
-int create_ftp_server(const char *host, unsigned short port) {
-    if(chroot(root_path) !=0 ) {
-       printf("Wrong: cannot find root path!\n");
+int create_ftp_server(Config* config) {
+    if(chroot(config->root_path) !=0 ) {
+       printf("Wrong: cannot find root path '%s'!\n", config->root_path);
        exit(EXIT_FAILURE);
     }
-    int sockfd = create_socket(port);
+    int sockfd = create_socket(config->listen_port, NULL);
     return sockfd;
 }
 
@@ -48,6 +48,7 @@ void* process_request(void* client_descriptor) {
     }
 
     close(sockfd);
+    if (state->sock_addr) free(state->sock_addr);
     free(state);
     printf("Client disconnected!\n");
 

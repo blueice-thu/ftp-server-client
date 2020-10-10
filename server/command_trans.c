@@ -5,18 +5,14 @@ void command_retr(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
+    printf("command_retr begin\n");
     if (state->mode == NORMAL) {
         send_message(state, "425 Use PORT or PASV first.\n");
         return;
     }
     else if (state->mode == ACTIVE || state->mode == PASSIVE) {
         if (state->mode == PASSIVE) {
-            if (state->data_trans_fd > 2)
-                close(state->data_trans_fd);
-            struct sockaddr_in client_address;
-            int addrlen = sizeof(client_address);
-            state->data_trans_fd = accept(state->passive_socket, (struct sockaddr*) &client_address, &addrlen);
-            close(state->passive_socket);
+            state->data_trans_fd = accept(state->passive_socket, NULL, NULL);
         }
         FILE* fp = fopen(args, "r");
         if (fp == NULL) {
@@ -33,12 +29,13 @@ void command_retr(char* args, Session* state) {
             fclose(fp);
             send_message(state, "226 Transfer complete.\n");
         }
-        close(state->data_trans_fd);
+        close_trans_conn(state);
     }
     else {
         printf("Wrong: mode!\n");
         exit(EXIT_FAILURE);
     }
+    printf("command_retr end\n");
 }
 
 void command_stor(char* args, Session* state) {
@@ -52,12 +49,7 @@ void command_stor(char* args, Session* state) {
     }
     else if (state->mode == ACTIVE || state->mode == PASSIVE) {
         if (state->mode == PASSIVE) {
-            if (state->data_trans_fd > 2)
-                close(state->data_trans_fd);
-            struct sockaddr_in client_address;
-            int addrlen = sizeof(client_address);
-            state->data_trans_fd = accept(state->passive_socket, (struct sockaddr*) &client_address, &addrlen);
-            close(state->passive_socket);
+            state->data_trans_fd = accept(state->passive_socket, NULL, NULL);
         }
         FILE* fp = fopen(args, "w");
         if (fp == NULL) {
@@ -75,7 +67,7 @@ void command_stor(char* args, Session* state) {
         send_message(state, "226 Transfer complete.\n");
         close(file_handle);
         fclose(fp);
-        close(state->data_trans_fd);
+        close_trans_conn(state);
     }
     else {
         printf("Wrong: mode!\n");

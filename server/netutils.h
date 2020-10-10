@@ -9,7 +9,7 @@
 #include "command_trans.h"
 
 // Create server
-int create_ftp_server(const char *host, unsigned short port);
+int create_ftp_server(Config* config);
 
 void receive_request(int listener_d);
 
