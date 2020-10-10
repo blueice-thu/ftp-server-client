@@ -49,44 +49,36 @@ void command_port(char* args, Session* state) {
     }
 }
 
-// void generate_random_port(int* port1, int* port2) {
-//     srand(time(NULL));
-//     *port1 = 128 + (rand() % 64);
-//     *port2 = rand() % 0xff;
-// }
-
 void command_pasv(char* args, Session* state) {
     if (state->logged == 0) {
         write(state->sockfd, need_login_msg, sizeof(need_login_msg));
         return;
     }
 
-    // int port1 = 0, port2 = 0, port;
-    // srand(time(NULL));
-    // port1 = 128 + (rand() % 64);
-    // port2 = rand() % 0xff;
-    // // generate_random_port(&port1, &port2);
-    // port = 256 * port1 + port2;
+    int port1 = 0, port2 = 0, port;
+    srand(time(NULL));
+    port1 = 128 + (rand() % 64);
+    port2 = rand() % 0xff;
+    port = 256 * port1 + port2;
 
-    // int sockfd = state->sockfd;
-    // socklen_t addr_size = sizeof(struct sockaddr_in);
-    // struct sockaddr_in addr;
-    // if (getsockname(sockfd, (struct sockaddr *)&addr, &addr_size) != 0) {
-    //     printf("Wrong: unknown error!\n");
-    //     exit(EXIT_FAILURE);
-    // }
-    // int ip[4] = { 0 };
-    // int host = addr.sin_addr.s_addr;
-    // for (int i = 0; i < 4; i++) 
-    //     ip[i] = (host >> i * 8) & 0xff;
+    int sockfd = state->sockfd;
+    socklen_t addr_size = sizeof(struct sockaddr_in);
+    struct sockaddr_in addr;
+    if (getsockname(sockfd, (struct sockaddr *)&addr, &addr_size) != 0) {
+        send_message(state, "425 Cannot open passive connection.\n");
+        return ;
+    }
+    int ip[4] = { 0 };
+    int host = addr.sin_addr.s_addr;
+    for (int i = 0; i < 4; i++) 
+        ip[i] = (host >> i * 8) & 0xff;
     
-    // close(state->passive_socket);
-    // state->passive_socket = create_socket(port);
-    // state->mode = PASSIVE;
-    // printf("Passive port: %d\n", state->passive_socket);
+    if (state->passive_socket > 2)
+        close(state->passive_socket);
+    state->passive_socket = create_socket(port);
+    state->mode = PASSIVE;
 
-    // char message[128] = { '\0' };
-    // sprintf(message, passive_msg, ip[0], ip[1], ip[2], ip[3], port1, port2);
-    // write(state->sockfd, message, sizeof(message));
-    // printf("%s\n", message);
+    char msg[MSG_LENGTH] = { '\0' };
+    sprintf(msg, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).\n", ip[0], ip[1], ip[2], ip[3], port1, port2);
+    send_message(state, msg);
 }

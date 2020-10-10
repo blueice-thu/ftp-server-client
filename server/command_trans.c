@@ -9,7 +9,15 @@ void command_retr(char* args, Session* state) {
         send_message(state, "425 Use PORT or PASV first.\n");
         return;
     }
-    else if (state->mode == ACTIVE) {
+    else if (state->mode == ACTIVE || state->mode == PASSIVE) {
+        if (state->mode == PASSIVE) {
+            if (state->data_trans_fd > 2)
+                close(state->data_trans_fd);
+            struct sockaddr_in client_address;
+            int addrlen = sizeof(client_address);
+            state->data_trans_fd = accept(state->passive_socket, (struct sockaddr*) &client_address, &addrlen);
+            close(state->passive_socket);
+        }
         FILE* fp = fopen(args, "r");
         if (fp == NULL) {
             send_message(state, "550 No such file or directory.\n");
@@ -27,9 +35,6 @@ void command_retr(char* args, Session* state) {
         }
         close(state->data_trans_fd);
     }
-    else if (state->mode == PASSIVE) {
-        // TODO
-    }
     else {
         printf("Wrong: mode!\n");
         exit(EXIT_FAILURE);
@@ -37,7 +42,6 @@ void command_retr(char* args, Session* state) {
 }
 
 void command_stor(char* args, Session* state) {
-    // TODO
     if (state->logged == 0) {
         send_message(state, need_login_msg);
         return;
@@ -46,35 +50,32 @@ void command_stor(char* args, Session* state) {
         send_message(state, "425 Use PORT or PASV first.\n");
         return;
     }
-    else if (state->mode == ACTIVE) {
+    else if (state->mode == ACTIVE || state->mode == PASSIVE) {
+        if (state->mode == PASSIVE) {
+            if (state->data_trans_fd > 2)
+                close(state->data_trans_fd);
+            struct sockaddr_in client_address;
+            int addrlen = sizeof(client_address);
+            state->data_trans_fd = accept(state->passive_socket, (struct sockaddr*) &client_address, &addrlen);
+            close(state->passive_socket);
+        }
         FILE* fp = fopen(args, "w");
         if (fp == NULL) {
             send_message(state, "550 No such file or directory.\n");
             return ;
         }
         send_message(state, "150 Opening data connection.\n");
-        int receive_bytes = 0, n = 0;
-        char buffer[BUFFER_LENGTH];
-        while (1) {
-            n = 0;
-            while (1) {
-                receive_bytes = recv(state->data_trans_fd, &buffer[n], 1, 0);
-                if (receive_bytes <= 0) break;
-                if (buffer[n] == '\n') {
-                    buffer[n] == '\0';
-                    break;
-                }
-                if (buffer[n] == '\r') n++;
-            }
-            if (receive_bytes <= 0) break;
-            fprintf(fp, "%s\n", buffer);
+        int file_handle = fileno(fp);
+        int pipefd[2];
+        int res = 1;
+        if(pipe(pipefd)==-1) perror("ftp_stor: pipe");
+        while ((res = splice(state->data_trans_fd, 0, pipefd[1], NULL, BUFFER_LENGTH, SPLICE_F_MORE | SPLICE_F_MOVE))>0){
+            splice(pipefd[0], NULL, file_handle, 0, BUFFER_LENGTH, SPLICE_F_MORE | SPLICE_F_MOVE);
         }
         send_message(state, "226 Transfer complete.\n");
+        close(file_handle);
         fclose(fp);
         close(state->data_trans_fd);
-    }
-    else if (state->mode == PASSIVE) {
-        // TODO
     }
     else {
         printf("Wrong: mode!\n");

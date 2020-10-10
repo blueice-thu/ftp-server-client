@@ -64,7 +64,7 @@ void command_list(char* args, Session* state) {
         write(state->sockfd, msg, sizeof(msg));
         return;
     }
-    else if (state->mode == ACTIVE) {
+    else if (state->mode == ACTIVE || state->mode == PASSIVE) {
         DIR* dir_ptr;
         struct dirent *direntp;
         if ((dir_ptr = opendir(".")) == NULL) {
@@ -72,6 +72,14 @@ void command_list(char* args, Session* state) {
             return ;
         }
         else {
+            if (state->mode == PASSIVE) {
+                if (state->data_trans_fd > 2)
+                    close(state->data_trans_fd);
+                struct sockaddr_in client_address;
+                int addrlen = sizeof(client_address);
+                state->data_trans_fd = accept(state->passive_socket, (struct sockaddr*) &client_address, &addrlen);
+                close(state->passive_socket);
+            }
             send_message(state, "150 Opening data connection.\n");
             while((direntp = readdir(dir_ptr)) != NULL) {
                 if(strcmp(direntp->d_name, ".") != 0 && strcmp(direntp->d_name, "..") != 0) {
@@ -83,9 +91,6 @@ void command_list(char* args, Session* state) {
         }
         close(state->data_trans_fd);
         send_message(state, "226 Closing data connection.\n");
-    }
-    else if (state->mode == PASSIVE) {
-        //TODO
     }
     else {
         printf("Wrong: mode!\n");

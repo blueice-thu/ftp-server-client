@@ -2,6 +2,7 @@
 #define _COMMON_H_
 
 #define _XOPEN_SOURCE 500
+#define _GNU_SOURCE 1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +24,7 @@
 #include <ftw.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <fcntl.h>
 
 extern unsigned int listen_port;
 extern char* listen_address;
@@ -86,5 +88,7 @@ typedef struct Session {
 } Session;
 
 void send_message(Session* state, const char* msg);
+
+int create_socket(int port);
 
 #endif
