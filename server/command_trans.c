@@ -60,6 +60,7 @@ void command_stor(char* args, Session* state) {
             return ;
         }
         send_message(state, "150 Opening data connection.\n");
+        //TODO
         int file_handle = fileno(fp);
         int pipefd[2];
         int res = 1;

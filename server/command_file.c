@@ -63,25 +63,38 @@ void command_list(char* args, Session* state) {
         return;
     }
     else if (state->mode == ACTIVE || state->mode == PASSIVE) {
-        DIR* dir_ptr;
+        DIR* dir_ptr = opendir(".");
         struct dirent *direntp;
-        if ((dir_ptr = opendir(".")) == NULL) {
+        if (dir_ptr == NULL) {
             send_message(state, "551 File listing failed.\n");
             return ;
         }
-        else {
-            if (state->mode == PASSIVE) {
-                state->data_trans_fd = accept(state->passive_socket, NULL, NULL);
-            }
-            send_message(state, "150 Opening data connection.\n");
-            while((direntp = readdir(dir_ptr)) != NULL) {
-                if(strcmp(direntp->d_name, ".") != 0 && strcmp(direntp->d_name, "..") != 0) {
-                    strcat(direntp->d_name, " ");
-                    send(state->data_trans_fd, direntp->d_name, strlen(direntp->d_name), 0);
-                }
-            }
-            closedir(dir_ptr);
+        send_message(state, "150 Opening data connection.\n");
+        if (state->mode == PASSIVE) {
+            state->data_trans_fd = accept(state->passive_socket, NULL, NULL);
         }
+        struct dirent *dr;
+        while((dr = readdir(dir_ptr)))
+        {
+            const char *filename = dr->d_name;
+            if(filename[0] == '.')
+                continue;
+
+            struct stat data_info;
+            if(lstat(filename, &data_info) == -1) {
+                printf("Wrong: list.\n");
+                exit(EXIT_FAILURE);
+            }
+            char buffer[BUFFER_LENGTH] = "%s";
+            strncpy(buffer, filename, BUFFER_LENGTH);
+            strcat(buffer, "\r\n");
+            
+            int bytes = write(state->data_trans_fd, buffer, strlen(buffer));
+            state->trans_all_bytes += bytes;
+        }
+        state->trans_all_num += 1;
+        closedir(dir_ptr);
+            
         close_trans_conn(state);
         send_message(state, "226 Closing data connection.\n");
     }

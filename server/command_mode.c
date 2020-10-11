@@ -6,10 +6,13 @@ void command_type(char* args, Session* state) {
         return;
     }
     if(strcmp(args, "I") != 0) {
-        send_message(state, "503 Wrong type.\n");
+        send_message(state, "200 Type set to I.\n");
+    }
+    else if (strcmp(args, "A") != 0) {
+        send_message(state, "200 Type set to A.\n");
     }
     else {
-        send_message(state, "200 Type set to I.\n");
+        send_message(state, "503 Wrong type.\n");
     }
 }
 
