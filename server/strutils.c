@@ -66,15 +66,6 @@ void read_config(Config* config) {
 
 }
 
-
-static const struct option long_options[] = {
-    { "help", 0, NULL, 'h' },
-    { "port", 1, NULL, 'p' },
-    { "root", 1, NULL, 'r' },
-    { NULL, 0, NULL, 0 }
-};
-static const char short_options[] = "p::r::";
-
 void get_paras(int argc, char *argv[], Config* config) {
     int opt = 0;
     while((opt=getopt_long(argc, argv, short_options, long_options,NULL))!=-1) {
@@ -83,7 +74,7 @@ void get_paras(int argc, char *argv[], Config* config) {
             case 0:break;
             case 'h': {
                 printf("Usage: sudo ./ftpServer --port 12306 --root ./spb/tmp\n");
-                break;
+                exit(0);
             }
             case 'p': {
                 config->listen_port = atoi(optarg);

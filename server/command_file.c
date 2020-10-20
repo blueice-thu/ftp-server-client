@@ -1,7 +1,7 @@
 #include "common.h"
 
 void command_mkd(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -21,7 +21,7 @@ void command_mkd(char* args, Session* state) {
 }
 
 void command_cwd(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -34,7 +34,7 @@ void command_cwd(char* args, Session* state) {
 }
 
 void command_pwd(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -54,7 +54,7 @@ void command_pwd(char* args, Session* state) {
 
 void command_list(char* args, Session* state) {
     // TODO
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -116,7 +116,7 @@ static int rmFiles(const char *pathname, const struct stat *sbuf, int type, stru
 
 void command_rmd(char* args, Session* state) {
     // TODO
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -136,7 +136,7 @@ void command_rmd(char* args, Session* state) {
 }
 
 void command_rnfr(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -157,7 +157,7 @@ void command_rnfr(char* args, Session* state) {
 }
 
 void command_rnto(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -173,7 +173,7 @@ void command_rnto(char* args, Session* state) {
 }
 
 void command_dele(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -186,7 +186,7 @@ void command_dele(char* args, Session* state) {
 }
 
 void command_cdup(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }

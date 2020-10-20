@@ -1,7 +1,7 @@
 #include "command_mode.h"
 
 void command_type(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -18,7 +18,7 @@ void command_type(char* args, Session* state) {
 
 void command_port(char* args, Session* state) {
     // TODO
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -51,17 +51,10 @@ void command_port(char* args, Session* state) {
 }
 
 void command_pasv(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
-    printf("command_pasv begin\n");
-
-    // int port1 = 0, port2 = 0, port;
-    // srand(time(NULL));
-    // port1 = 128 + (rand() % 64);
-    // port2 = rand() % 0xff;
-    // port = 256 * port1 + port2;
 
     state->passive_socket = create_socket(0, state);
     struct sockaddr_in *sock_addr = state->sock_addr;
@@ -80,7 +73,5 @@ void command_pasv(char* args, Session* state) {
     int port1 = port / 256;
     int port2 = port % 256;
     sprintf(msg, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).\n", ip[0], ip[1], ip[2], ip[3], port1, port2);
-    printf("%s\n", msg);
     send_message(state, msg);
-    printf("command_pasv end\n");
 }

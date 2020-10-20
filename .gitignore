@@ -54,3 +54,4 @@ dkms.conf
 .vscode/
 */.idea/
 .idea/
+__pycache__/

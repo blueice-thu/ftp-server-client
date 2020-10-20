@@ -3,8 +3,8 @@
 
 int create_ftp_server(Config* config) {
     if(chroot(config->root_path) !=0 ) {
-       printf("Wrong: cannot find root path '%s'!\n", config->root_path);
-       exit(EXIT_FAILURE);
+        printf("%s: %s\n", config->root_path, strerror(errno));
+        exit(EXIT_FAILURE);
     }
     int sockfd = create_socket(config->listen_port, NULL);
     return sockfd;
@@ -56,10 +56,10 @@ void* process_request(void* client_descriptor) {
 }
 
 void process_command(char* command, char* args, Session* state) {
-    int cmdlist_count = sizeof(cmdlist_str) / sizeof(char *);
+    int cmdlist_count = sizeof(cmdlistStr) / sizeof(char *);
     int command_index = -1;
     for (int i = 0; i < cmdlist_count; i++) {
-        if (strcmp(command, cmdlist_str[i]) == 0) {
+        if (strcmp(command, cmdlistStr[i]) == 0) {
             command_index = i;
             break;
         }

@@ -6,7 +6,7 @@ void command_user(char* args, Session* state) {
     send_message(state, "331 Guest login okay, send your complete e-mail address as password.\n");
     return;
 
-    if (state->logged == 1) {
+    if (state->is_logged == 1) {
         send_message(state, "230 Already logged-in.\n");
     }
     else if (strcmp(args, username) != 0) {
@@ -21,10 +21,10 @@ void command_user(char* args, Session* state) {
 void command_pass(char* args, Session* state) {
     // TODO
     send_message(state, login_succeed_msg);
-    state->logged = 1;
+    state->is_logged = 1;
     return;
 
-    if (state->logged == 1) {
+    if (state->is_logged == 1) {
         send_message(state, "202 Already logged in.\n");
     }
     else if (strcmp(state->username, username) != 0) {
@@ -35,7 +35,7 @@ void command_pass(char* args, Session* state) {
     }
     else {
         send_message(state, "230 User logged in, proceed.\n");
-        state->logged = 1;
+        state->is_logged = 1;
     }
 }
 

@@ -1,7 +1,7 @@
 #include "command_trans.h"
 
 void command_retr(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
@@ -25,7 +25,7 @@ void command_retr(char* args, Session* state) {
             char buffer[BUFFER_LENGTH];
             state->trans_file_num += 1;
             while (!feof(fp)) {
-                fgets(buffer, DATA_BUFFER, fp);
+                fgets(buffer, BUFFER_LENGTH, fp);
                 int bytes = send(state->data_trans_fd, buffer, strlen(buffer), 0);
                 state->trans_file_bytes += bytes;
             }
@@ -42,7 +42,7 @@ void command_retr(char* args, Session* state) {
 }
 
 void command_stor(char* args, Session* state) {
-    if (state->logged == 0) {
+    if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
