@@ -43,15 +43,14 @@ static const char network_fail_msg[] = "426 Network terminated.\n";
 static const char no_file_msg[] = "550 No such file or directory.\n";
 static const char no_permis_msg[] = "550 Permission denied.\n";
 
-static const char username[] = "anonymous";
-static const char password[] = "password";
-
 #define BUFFER_LENGTH   1024    // Length of data buffer to transfer data
 #define COMMAND_LENGTH  8       // Maximum length of command
 #define ARGS_LENGTH     128     // Maximum length of parameter
 #define USERNAME_LENGTH 32      // Maximum length of usename
+#define PASSWORD_LENGTH 32      // Maximum length of password
 #define PATH_LENGTH     256     // Maximum length of server path
 #define MSG_LENGTH      512     // Maximum length of a message
+#define TIMEOUT         20      // Seconds
 
 typedef struct sockaddr_in SockAddrIn;
 typedef struct sockaddr SockAddr;
@@ -60,7 +59,13 @@ typedef struct Config {
     unsigned int listen_port;
     char* listen_address;
     char* root_path;
+    int num_user;
+    int custom_num_user;
+    char** username_table;
+    char** password_table;
 } Config;
+
+extern Config config;
 
 // Supported ftp commands
 typedef enum cmdlist { 
@@ -80,7 +85,7 @@ typedef enum SessionMode {
 
 // All information in a connection
 typedef struct Session {
-    char username[USERNAME_LENGTH];
+    int user_index;
     int is_logged;          // Login status
     SockAddrIn* sock_addr;
     int sock_pasv;
@@ -115,8 +120,27 @@ int create_socket(int port, Session* state);
 void get_local_ip(int sockfd, int* ip);
 
 /**
+* Update Session.data_trans_fd according to work mode
+*/
+void update_data_trans_fd(Session* state);
+
+/**
 * Close data_trans_fd and sock_pasv
 */
 void close_trans_conn(Session* state);
+
+/**
+* Search username from username_table given by config.conf
+*/
+int search_username(const char* username);
+
+/**
+* Check password of given username
+* @param index The index of username
+* @param password Given password to verify
+*/
+int check_password(int index, const char* password);
+
+void free_config();
 
 #endif

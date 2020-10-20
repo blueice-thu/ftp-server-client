@@ -9,7 +9,7 @@
 #include "command_trans.h"
 
 // Create server and return sockfd
-int create_ftp_server(Config* config);
+int create_ftp_server();
 
 /**
 * Accept new client request and create thread for every client

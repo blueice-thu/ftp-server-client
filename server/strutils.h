@@ -21,7 +21,7 @@ void check_root_permission();
 * Read parament configs from config.conf
 * @param config A config struct pointer to store
 */
-void read_config(Config* config);
+void read_config();
 
 /**
 * Read paraments from opts. 
@@ -31,6 +31,6 @@ void read_config(Config* config);
 * @param argv String list of parameters
 * @param config A config struct pointer to store
 */
-void get_paras(int argc, char *argv[], Config* config);
+void get_paras(int argc, char *argv[]);
 
 #endif

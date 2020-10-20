@@ -1,5 +1,7 @@
 #include "common.h"
 
+Config config;
+
 void send_message(Session* state, const char* msg) {
     int bytes = strlen(msg);
     state->trans_all_bytes += bytes;
@@ -56,9 +58,52 @@ void get_local_ip(int sockfd, int* ip) {
         ip[i] = (host >> i * 8) & 0xff;
 }
 
+void update_data_trans_fd(Session* state) {
+    if (state->mode == ACTIVE) {
+        int status = connect(state->data_trans_fd, (SockAddr*)(state->port_addr), sizeof(SockAddr));
+        if (status != 0) {
+            if (state->data_trans_fd > 2) close(state->data_trans_fd);
+            state->data_trans_fd = -1;
+        }
+    }
+    else if (state->mode == PASSIVE) {
+        state->data_trans_fd = accept(state->sock_pasv, NULL, NULL);
+    }
+    else {
+        state->data_trans_fd = -1;
+    }
+}
+
 void close_trans_conn(Session* state) {
     close(state->data_trans_fd);
     if (state->mode == PASSIVE) {
         close(state->sock_pasv);
     }
+}
+
+int search_username(const char* username) {
+    int index = -1;
+    for (int i = 0; i < config.custom_num_user; i++) {
+        if (strcmp(username, config.username_table[i]) == 0)
+            return i;
+    }
+    return index;
+}
+
+int check_password(int index, const char* password) {
+    if (index < 0) return 0;
+    if (strcmp(config.password_table[index], password) == 0)
+        return 1;
+    return 0;
+}
+
+void free_config() {
+    free(config.listen_address);
+    free(config.root_path);
+    for (int i = 0; i < config.custom_num_user; i++) {
+        free(config.username_table[i]);
+        free(config.password_table[i]);
+    }
+    free(config.username_table);
+    free(config.password_table);
 }

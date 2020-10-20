@@ -4,11 +4,10 @@
 int main(int argc, char *argv[]) {
     check_root_permission();
 
-    Config config = { 21, NULL, NULL };
-    read_config(&config);
-    get_paras(argc, argv, &config);
+    read_config();
+    get_paras(argc, argv);
 
-    int listen_fd = create_ftp_server(&config);
+    int listen_fd = create_ftp_server();
 
     int ip[4] = { 0 };
     get_local_ip(listen_fd, ip);
@@ -22,7 +21,6 @@ int main(int argc, char *argv[]) {
     receive_request(listen_fd);
     close(listen_fd);
 
-    free(config.listen_address);
-    free(config.root_path);
+    free_config();
     return 0;
 }

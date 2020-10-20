@@ -58,47 +58,46 @@ void command_list(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
+    update_data_trans_fd(state);
     if (state->mode == NORMAL) {
-        send_message(state, "425 Need PORT or PASV mode.\n");
+        send_message(state, "425 Use PORT or PASV first.\n");
         return;
     }
-    else if (state->mode == ACTIVE || state->mode == PASSIVE) {
-        DIR* dir_ptr = opendir(".");
-        struct dirent *direntp;
-        if (dir_ptr == NULL) {
-            send_message(state, "551 File listing failed.\n");
-            return ;
-        }
-        send_message(state, "150 Opening data connection.\n");
-        struct dirent *dr;
-        while((dr = readdir(dir_ptr)))
-        {
-            const char *filename = dr->d_name;
-            if(filename[0] == '.')
-                continue;
+    if (state->data_trans_fd <= 0) {
+        send_message(state, "425 Fail to establish connection.\n");
+        return;
+    }
+    send_message(state, "150 Opening data connection.\n");
+    DIR* dir_ptr = opendir(".");
+    if (dir_ptr == NULL) {
+        send_message(state, "551 File listing failed.\n");
+        return ;
+    }
+    struct dirent *dr;
+    while((dr = readdir(dir_ptr)))
+    {
+        const char *filename = dr->d_name;
+        if(filename[0] == '.')
+            continue;
 
-            struct stat data_info;
-            if(lstat(filename, &data_info) == -1) {
-                printf("Wrong: list.\n");
-                exit(EXIT_FAILURE);
-            }
-            char buffer[BUFFER_LENGTH] = "%s";
-            strncpy(buffer, filename, BUFFER_LENGTH);
-            strcat(buffer, "\r\n");
-            
-            int bytes = write(state->data_trans_fd, buffer, strlen(buffer));
-            state->trans_all_bytes += bytes;
+        struct stat data_info;
+        if(lstat(filename, &data_info) == -1) {
+            printf("Wrong: list.\n");
+            exit(EXIT_FAILURE);
         }
-        state->trans_all_num += 1;
-        closedir(dir_ptr);
-            
-        close_trans_conn(state);
-        send_message(state, "226 Closing data connection.\n");
+        char buffer[BUFFER_LENGTH] = "%s";
+        strncpy(buffer, filename, BUFFER_LENGTH);
+        strcat(buffer, "\r\n");
+        
+        int bytes = write(state->data_trans_fd, buffer, strlen(buffer));
+        state->trans_all_bytes += bytes;
     }
-    else {
-        printf("Wrong: mode!\n");
-        exit(EXIT_FAILURE);
-    }
+    state->trans_all_num += 1;
+    closedir(dir_ptr);
+        
+    close_trans_conn(state);
+    send_message(state, "226 Closing data connection.\n");
+    
 }
 
 static int rmFiles(const char *pathname, const struct stat *sbuf, int type, struct FTW *ftwb)

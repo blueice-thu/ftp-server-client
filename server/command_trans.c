@@ -6,14 +6,21 @@ void command_retr(char* args, Session* state) {
         return;
     }
     printf("command_retr begin\n");
-    if (state->mode == NORMAL || state->data_trans_fd <= 0) {
-        send_message(state, "425 Use PORT or PASV first.\n");
-        return;
-    }
+
     FILE* fp = fopen(args, "r");
     if (fp == NULL) {
         send_message(state, "550 No such file or directory.\n");
         return ;
+    }
+
+    if (state->mode == NORMAL) {
+        send_message(state, "425 Use PORT or PASV first.\n");
+        return;
+    }
+    update_data_trans_fd(state);
+    if (state->data_trans_fd <= 0) {
+        send_message(state, "425 Fail to establish connection.\n");
+        return;
     }
     send_message(state, "150 Opening data connection.\n");
 
@@ -25,6 +32,7 @@ void command_retr(char* args, Session* state) {
         state->trans_all_bytes += bytes;
         memset(buffer, 0, BUFFER_LENGTH);
     }
+
     fclose(fp);
     send_message(state, "226 Transfer complete.\n");
     state->trans_file_num += 1;
@@ -38,14 +46,21 @@ void command_stor(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if (state->mode == NORMAL) {
-        send_message(state, "425 Use PORT or PASV first.\n");
-        return;
-    }
+    
     FILE* fp = fopen(args, "w");
     if (fp == NULL) {
         send_message(state, "550 No such file or directory.\n");
         return ;
+    }
+
+    if (state->mode == NORMAL) {
+        send_message(state, "425 Use PORT or PASV first.\n");
+        return;
+    }
+    update_data_trans_fd(state);
+    if (state->data_trans_fd <= 0) {
+        send_message(state, "425 Fail to establish connection.\n");
+        return;
     }
     send_message(state, "150 Opening data connection.\n");
 
@@ -54,23 +69,22 @@ void command_stor(char* args, Session* state) {
     while (recv_length = recv(state->data_trans_fd, buffer, BUFFER_LENGTH, 0)) {
         if (recv_length < 0) {
             send_message(state, "426 Data connection error.\n");
-            fclose(fp);
-            close_trans_conn(state);
-            break;
+            fclose(fp); close_trans_conn(state);
+            return;
         }
         state->trans_file_bytes += recv_length;
         state->trans_all_bytes += recv_length;
         write_length = fwrite(buffer, sizeof(char), recv_length, fp);
         if (write_length < recv_length) {
             send_message(state, "551 Error on output file.\n");
-            fclose(fp);
-            close_trans_conn(state);
-            break;
+            fclose(fp); close_trans_conn(state);
+            return;
         }
         memset(buffer, 0, BUFFER_LENGTH);
     }
     send_message(state, "226 Transfer complete.\n");
     state->trans_file_num += 1;
+    
     fclose(fp);
     close_trans_conn(state);
 }

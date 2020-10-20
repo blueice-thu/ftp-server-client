@@ -1,46 +1,38 @@
 #include "command_access.h"
 
 void command_user(char* args, Session* state) {
-    // TODO
-    strcpy(state->username, username);
-    send_message(state, "331 Guest login okay, send your complete e-mail address as password.\n");
-    return;
-
     if (state->is_logged == 1) {
         send_message(state, "230 Already logged-in.\n");
+        return;
     }
-    else if (strcmp(args, username) != 0) {
+    state->user_index = search_username(args);
+    if (state->user_index == -1) {
         send_message(state, "530 Invalid username.\n");
     }
     else {
-        strcpy(state->username, username);
         send_message(state, "331 Guest login okay, send your complete e-mail address as password.\n");
     }
 }
 
 void command_pass(char* args, Session* state) {
-    // TODO
-    send_message(state, login_succeed_msg);
-    state->is_logged = 1;
-    return;
-
     if (state->is_logged == 1) {
         send_message(state, "202 Already logged in.\n");
+        return;
     }
-    else if (strcmp(state->username, username) != 0) {
+    if (state->user_index == -1) {
         send_message(state, "503 Login with USER first.\n");
+        return;
     }
-    else if (strcmp(args, password) != 0) {
-        send_message(state, "530 Authentication failed.\n");
-    }
-    else {
+    if (check_password(state->user_index, args)) {
         send_message(state, "230 User logged in, proceed.\n");
         state->is_logged = 1;
+    }
+    else {
+        send_message(state, "530 Authentication failed.\n");
     }
 }
 
 void command_quit(char* args, Session* state) {
-    //TODO
     char quit_msg[] = "221-You have transferred %d bytes in %d files.\n"\
                 "221-Total traffic for this session was %d bytes in %d transfers.\n"\
                 "221-Thank you for using the FTP service on ftp.ssast.org.\n"\
@@ -48,10 +40,11 @@ void command_quit(char* args, Session* state) {
     char msg[MSG_LENGTH] = { '\0' };
     sprintf(msg, quit_msg, state->trans_file_bytes, state->trans_file_num, state->trans_all_bytes, state->trans_all_num);
     send_message(state, msg);
+    state->is_logged = 0;
+    close(state->sockfd);
 }
 
 void command_syst(char* args, Session* state) {
-    //TODO
     send_message(state, "215 UNIX Type: L8.\n");
 }
 

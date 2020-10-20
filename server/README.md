@@ -12,6 +12,7 @@
 - 查看特定端口占用：netstat -nltp | grep 12306
 - 查看端口占用进程：sudo lsof -i:12306
 - 杀死进程：sudo kill -9 10256
+- `sudo` start vscode: `sudo code --user-data-dir="~/.vscode-root"`
 
 # linux FTP命令
 

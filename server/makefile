@@ -3,7 +3,7 @@
 CC = gcc
 CFLAGS=-Wall -g
 # CFLAGS = -Wno-unused-function
-BIN = ftpServer
+BIN = main
 OBJS = main.o strutils.o netutils.o common.o command_access.o command_file.o command_mode.o command_trans.o
 LIB = -lpthread
 

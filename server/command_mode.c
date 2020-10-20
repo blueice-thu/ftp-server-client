@@ -5,7 +5,7 @@ void command_type(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if(strcmp(args, "I") != 0) {
+    if(strcmp(args, "I") == 0) {
         send_message(state, "200 Switching to Binary mode.\n");
     }
     else {
@@ -40,16 +40,7 @@ void command_port(char* args, Session* state) {
         state->data_trans_fd = -1;
         return;
     }
-
-    if (connect(state->data_trans_fd, (SockAddr*)(state->port_addr), sizeof(SockAddr)) != 0) {
-        printf("Fail to connect %s %d.\n", inet_ntoa(port_addr->sin_addr), ntohs(port_addr->sin_port));
-        send_message(state, "425 Fail to establish connection.\n");
-        if (state->data_trans_fd > 2) close(state->data_trans_fd);
-        state->data_trans_fd = -1;
-    }
-    else {
-        send_message(state, "200 Command PORT okay.\n");
-    }
+    send_message(state, "200 Command PORT okay.\n");
 }
 
 void command_pasv(char* args, Session* state) {
@@ -76,6 +67,4 @@ void command_pasv(char* args, Session* state) {
     int port2 = port % 256;
     sprintf(msg, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).\n", ip[0], ip[1], ip[2], ip[3], port1, port2);
     send_message(state, msg);
-
-    state->data_trans_fd = accept(state->sock_pasv, NULL, NULL);
 }
