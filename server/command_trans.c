@@ -6,38 +6,30 @@ void command_retr(char* args, Session* state) {
         return;
     }
     printf("command_retr begin\n");
-    if (state->mode == NORMAL) {
+    if (state->mode == NORMAL || state->data_trans_fd <= 0) {
         send_message(state, "425 Use PORT or PASV first.\n");
         return;
     }
-    else if (state->mode == ACTIVE || state->mode == PASSIVE) {
-        if (state->mode == PASSIVE) {
-            state->data_trans_fd = accept(state->passive_socket, NULL, NULL);
-        }
-        FILE* fp = fopen(args, "r");
-        if (fp == NULL) {
-            send_message(state, "550 No such file or directory.\n");
-            return ;
-        }
-        else {
-            send_message(state, "150 Opening data connection.\n");
+    FILE* fp = fopen(args, "r");
+    if (fp == NULL) {
+        send_message(state, "550 No such file or directory.\n");
+        return ;
+    }
+    send_message(state, "150 Opening data connection.\n");
 
-            char buffer[BUFFER_LENGTH];
-            state->trans_file_num += 1;
-            while (!feof(fp)) {
-                fgets(buffer, BUFFER_LENGTH, fp);
-                int bytes = send(state->data_trans_fd, buffer, strlen(buffer), 0);
-                state->trans_file_bytes += bytes;
-            }
-            fclose(fp);
-            send_message(state, "226 Transfer complete.\n");
-        }
-        close_trans_conn(state);
+    char buffer[BUFFER_LENGTH] = { 0 };
+    while (!feof(fp)) {
+        fgets(buffer, BUFFER_LENGTH, fp);
+        int bytes = send(state->data_trans_fd, buffer, strlen(buffer), 0);
+        state->trans_file_bytes += bytes;
+        state->trans_all_bytes += bytes;
+        memset(buffer, 0, BUFFER_LENGTH);
     }
-    else {
-        printf("Wrong: mode!\n");
-        exit(EXIT_FAILURE);
-    }
+    fclose(fp);
+    send_message(state, "226 Transfer complete.\n");
+    state->trans_file_num += 1;
+    
+    close_trans_conn(state);
     printf("command_retr end\n");
 }
 
@@ -50,31 +42,35 @@ void command_stor(char* args, Session* state) {
         send_message(state, "425 Use PORT or PASV first.\n");
         return;
     }
-    else if (state->mode == ACTIVE || state->mode == PASSIVE) {
-        if (state->mode == PASSIVE) {
-            state->data_trans_fd = accept(state->passive_socket, NULL, NULL);
-        }
-        FILE* fp = fopen(args, "w");
-        if (fp == NULL) {
-            send_message(state, "550 No such file or directory.\n");
-            return ;
-        }
-        send_message(state, "150 Opening data connection.\n");
-        //TODO
-        int file_handle = fileno(fp);
-        int pipefd[2];
-        int res = 1;
-        if(pipe(pipefd)==-1) perror("ftp_stor: pipe");
-        while ((res = splice(state->data_trans_fd, 0, pipefd[1], NULL, BUFFER_LENGTH, SPLICE_F_MORE | SPLICE_F_MOVE))>0){
-            splice(pipefd[0], NULL, file_handle, 0, BUFFER_LENGTH, SPLICE_F_MORE | SPLICE_F_MOVE);
-        }
-        send_message(state, "226 Transfer complete.\n");
-        close(file_handle);
-        fclose(fp);
-        close_trans_conn(state);
+    FILE* fp = fopen(args, "w");
+    if (fp == NULL) {
+        send_message(state, "550 No such file or directory.\n");
+        return ;
     }
-    else {
-        printf("Wrong: mode!\n");
-        exit(EXIT_FAILURE);
+    send_message(state, "150 Opening data connection.\n");
+
+    char buffer[BUFFER_LENGTH] = { 0 };
+    int recv_length = 0, write_length = 0;
+    while (recv_length = recv(state->data_trans_fd, buffer, BUFFER_LENGTH, 0)) {
+        if (recv_length < 0) {
+            send_message(state, "426 Data connection error.\n");
+            fclose(fp);
+            close_trans_conn(state);
+            break;
+        }
+        state->trans_file_bytes += recv_length;
+        state->trans_all_bytes += recv_length;
+        write_length = fwrite(buffer, sizeof(char), recv_length, fp);
+        if (write_length < recv_length) {
+            send_message(state, "551 Error on output file.\n");
+            fclose(fp);
+            close_trans_conn(state);
+            break;
+        }
+        memset(buffer, 0, BUFFER_LENGTH);
     }
+    send_message(state, "226 Transfer complete.\n");
+    state->trans_file_num += 1;
+    fclose(fp);
+    close_trans_conn(state);
 }

@@ -39,11 +39,11 @@ void command_pwd(char* args, Session* state) {
         return;
     }
     
-    char word_path[PATH_LENGTH] = { '\0' };
-    if (getcwd(word_path, PATH_LENGTH) != NULL) {
+    char work_path[PATH_LENGTH] = { '\0' };
+    if (getcwd(work_path, PATH_LENGTH) != NULL) {
         char msg[MSG_LENGTH] = { '\0' };
         strcat(msg, "257 \"");
-        strcat(msg, word_path);
+        strcat(msg, work_path);
         strcat(msg, "\"\n");
         send_message(state, need_login_msg);
     }
@@ -70,9 +70,6 @@ void command_list(char* args, Session* state) {
             return ;
         }
         send_message(state, "150 Opening data connection.\n");
-        if (state->mode == PASSIVE) {
-            state->data_trans_fd = accept(state->passive_socket, NULL, NULL);
-        }
         struct dirent *dr;
         while((dr = readdir(dir_ptr)))
         {

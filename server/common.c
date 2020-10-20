@@ -11,31 +11,32 @@ int create_socket(int port, Session* state)
 {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
-        printf("Wrong: fail to open socket!\n");
-        return -1; 
+        perror("Error in socket of create_socket");
+        return -1;
     }
 
-    struct sockaddr_in *sock_addr = (struct sockaddr_in *)malloc(sizeof (struct sockaddr_in));
+    SockAddrIn *sock_addr = (SockAddrIn*)calloc(1, sizeof(SockAddrIn));
     sock_addr->sin_family = AF_INET;
     sock_addr->sin_port = htons(port);
     sock_addr->sin_addr.s_addr = htonl(INADDR_ANY);
 
+    // Make port be able to be reused
     int reuse = 1;
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(int)) == -1) {
         close(sockfd);
-        printf("Wrong: fail to set sockopt!\n");
+        perror("Error in setsockopt of create_socket");
         return -1; 
     }
 
-    if (bind(sockfd, (struct sockaddr *) sock_addr, sizeof(struct sockaddr_in)) < 0) {
+    if (bind(sockfd, (SockAddr *) sock_addr, sizeof(SockAddrIn)) < 0) {
         close(sockfd);
-        printf("Wrong: fail to bind!\n");
+        perror("Error in bind of create_socket");
         return -1; 
     }
     if(listen(sockfd, SOMAXCONN) < 0) {
         close(sockfd);
-        printf("Wrong: fail to listen!\n");
-        exit(EXIT_FAILURE);
+        perror("Error in listen of create_socket");
+        return -1;
     }
     if (state != NULL) {
         if (state->sock_addr != NULL) free(state->sock_addr);
@@ -47,9 +48,9 @@ int create_socket(int port, Session* state)
 }
 
 void get_local_ip(int sockfd, int* ip) {
-    struct sockaddr_in addr;
-    socklen_t addr_size = sizeof(struct sockaddr_in);
-    getsockname(sockfd, (struct sockaddr *)&addr, &addr_size);
+    SockAddrIn addr;
+    socklen_t addr_size = sizeof(SockAddrIn);
+    getsockname(sockfd, (SockAddr *)&addr, &addr_size);
     int host = addr.sin_addr.s_addr;
     for (int i = 0; i < 4; i++) 
         ip[i] = (host >> i * 8) & 0xff;
@@ -58,6 +59,6 @@ void get_local_ip(int sockfd, int* ip) {
 void close_trans_conn(Session* state) {
     close(state->data_trans_fd);
     if (state->mode == PASSIVE) {
-        close(state->passive_socket);
+        close(state->sock_pasv);
     }
 }

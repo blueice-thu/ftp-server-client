@@ -27,8 +27,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-static const char welcome_msg[] = "220 Anonymous FTP server ready.\n";
-static const char unknown_command_msg[] = "500 Unknown command.\n";
 static const char need_password_msg[] = "331 Guest login ok, send your complete e-mail address as password.\n";
 static const char user_invaild_msg[] = "530 Invalid username.\n";
 static const char need_login_msg[] = "530 Need login.\n";
@@ -54,6 +52,9 @@ static const char password[] = "password";
 #define USERNAME_LENGTH 32      // Maximum length of usename
 #define PATH_LENGTH     256     // Maximum length of server path
 #define MSG_LENGTH      512     // Maximum length of a message
+
+typedef struct sockaddr_in SockAddrIn;
+typedef struct sockaddr SockAddr;
 
 typedef struct Config {
     unsigned int listen_port;
@@ -81,10 +82,10 @@ typedef enum SessionMode {
 typedef struct Session {
     char username[USERNAME_LENGTH];
     int is_logged;          // Login status
-    struct sockaddr_in* sock_addr;
-    int passive_socket;
+    SockAddrIn* sock_addr;
+    int sock_pasv;
     SessionMode mode;       // Work mode restricted in SessionMode
-    struct sockaddr_in *port_addr;
+    SockAddrIn *port_addr;
     int sockfd;             // Sockfd for transfering message
     int data_trans_fd;      // Sockfd for transfering file
     int is_trans_data;      // State of transfering data
@@ -114,7 +115,7 @@ int create_socket(int port, Session* state);
 void get_local_ip(int sockfd, int* ip);
 
 /**
-* Close data_trans_fd and passive_socket
+* Close data_trans_fd and sock_pasv
 */
 void close_trans_conn(Session* state);
 

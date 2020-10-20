@@ -13,6 +13,6 @@
 - 查看端口占用进程：sudo lsof -i:12306
 - 杀死进程：sudo kill -9 10256
 
-# FTP命令
+# linux FTP命令
 
-- `quote PASV`：切换被动模式
+- `passive`：切换被动模式
