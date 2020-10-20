@@ -6,10 +6,10 @@ void command_type(char* args, Session* state) {
         return;
     }
     if(strcmp(args, "I") == 0) {
-        send_message(state, "200 Switching to Binary mode.\n");
+        send_message(state, "200 Switching to Binary mode.\r\n");
     }
     else {
-        send_message(state, "501 Syntax error.\n");
+        send_message(state, "501 Syntax error.\r\n");
     }
 }
 
@@ -40,7 +40,7 @@ void command_port(char* args, Session* state) {
         state->data_trans_fd = -1;
         return;
     }
-    send_message(state, "200 Command PORT okay.\n");
+    send_message(state, "200 Command PORT okay.\r\n");
 }
 
 void command_pasv(char* args, Session* state) {
@@ -52,10 +52,10 @@ void command_pasv(char* args, Session* state) {
     state->mode = PASSIVE;
 
     state->sock_pasv = create_socket(0, state);
-    SockAddrIn* sock_addr = state->sock_addr;
+    SockAddrIn* sock_addr = state->pasv_addr;
     socklen_t addr_size = sizeof(SockAddrIn);
     if (getsockname(state->sock_pasv, (SockAddr*)sock_addr, &addr_size) != 0) {
-        send_message(state, "425 Cannot open passive connection.\n");
+        send_message(state, "425 Cannot open passive connection.\r\n");
         return ;
     }
 
@@ -65,6 +65,6 @@ void command_pasv(char* args, Session* state) {
     int port = (int)(ntohs(sock_addr->sin_port));
     int port1 = port / 256;
     int port2 = port % 256;
-    sprintf(msg, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).\n", ip[0], ip[1], ip[2], ip[3], port1, port2);
+    sprintf(msg, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).\r\n", ip[0], ip[1], ip[2], ip[3], port1, port2);
     send_message(state, msg);
 }

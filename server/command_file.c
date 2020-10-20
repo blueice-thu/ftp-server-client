@@ -6,16 +6,16 @@ void command_mkd(char* args, Session* state) {
         return;
     }
     if (access(args, F_OK) == 0) {
-        send_message(state, "550 Folder already exists.\n");
+        send_message(state, "550 Folder already exists.\r\n");
     }
     else if (mkdir(args, 0777) == -1) {
-        send_message(state, "550 Fail to create directory.\n");
+        send_message(state, "550 Fail to create directory.\r\n");
     }
     else {
         char msg[MSG_LENGTH] = { '\0' };
         strcpy(msg, "257 Create directory \"");
         strcat(msg, args);
-        strcat(msg, "\" successfully.\n");
+        strcat(msg, "\" successfully.\r\n");
         send_message(state, msg);
     }
 }
@@ -26,10 +26,10 @@ void command_cwd(char* args, Session* state) {
         return;
     }
     if(chdir(args) == -1) {
-        send_message(state, "550 No such directory.\n");
+        send_message(state, "550 No such directory.\r\n");
     }
     else {
-        send_message(state, "250 Change directory successfully.\n");
+        send_message(state, "250 Change directory successfully.\r\n");
     }
 }
 
@@ -44,11 +44,11 @@ void command_pwd(char* args, Session* state) {
         char msg[MSG_LENGTH] = { '\0' };
         strcat(msg, "257 \"");
         strcat(msg, work_path);
-        strcat(msg, "\"\n");
+        strcat(msg, "\"\r\n");
         send_message(state, need_login_msg);
     }
     else {
-        send_message(state, "550 Failed to get pwd.\r\n");
+        send_message(state, "550 Failed to get pwd.\r\r\n");
     }
 }
 
@@ -60,17 +60,17 @@ void command_list(char* args, Session* state) {
     }
     update_data_trans_fd(state);
     if (state->mode == NORMAL) {
-        send_message(state, "425 Use PORT or PASV first.\n");
+        send_message(state, "425 Use PORT or PASV first.\r\n");
         return;
     }
     if (state->data_trans_fd <= 0) {
-        send_message(state, "425 Fail to establish connection.\n");
+        send_message(state, "425 Fail to establish connection.\r\n");
         return;
     }
-    send_message(state, "150 Opening data connection.\n");
+    send_message(state, "150 Opening data connection.\r\n");
     DIR* dir_ptr = opendir(".");
     if (dir_ptr == NULL) {
-        send_message(state, "551 File listing failed.\n");
+        send_message(state, "551 File listing failed.\r\n");
         return ;
     }
     struct dirent *dr;
@@ -82,12 +82,12 @@ void command_list(char* args, Session* state) {
 
         struct stat data_info;
         if(lstat(filename, &data_info) == -1) {
-            printf("Wrong: list.\n");
+            printf("Wrong: list.\r\n");
             exit(EXIT_FAILURE);
         }
         char buffer[BUFFER_LENGTH] = "%s";
         strncpy(buffer, filename, BUFFER_LENGTH);
-        strcat(buffer, "\r\n");
+        strcat(buffer, "\r\r\n");
         
         int bytes = write(state->data_trans_fd, buffer, strlen(buffer));
         state->trans_all_bytes += bytes;
@@ -96,7 +96,7 @@ void command_list(char* args, Session* state) {
     closedir(dir_ptr);
         
     close_trans_conn(state);
-    send_message(state, "226 Closing data connection.\n");
+    send_message(state, "226 Closing data connection.\r\n");
     
 }
 
@@ -118,16 +118,15 @@ void command_rmd(char* args, Session* state) {
     }
     struct stat st;
     stat(args, &st);
-    char msg[MSG_LENGTH] = { '\0' };
     if (access(args, F_OK) == -1 || !S_ISDIR(st.st_mode)) {
-        send_message(state, "550 Not a valid directory.\n");
+        send_message(state, "550 Not a valid directory.\r\n");
     }
     else if (nftw(args, rmFiles, 10, FTW_DEPTH | FTW_MOUNT | FTW_PHYS) < 0) {
         perror("ERROR: ntfw");
         exit(1);
     }
     else {
-        send_message(state, "250 Directory removed.\n");
+        send_message(state, "250 Directory removed.\r\n");
     }
 }
 
@@ -149,7 +148,7 @@ void command_rnfr(char* args, Session* state) {
     state->rename_from = (char*)malloc(PATH_LENGTH);
     strcpy(state->rename_from, args);
 
-    send_message(state, "350 Ready to rename file.\n");
+    send_message(state, "350 Ready to rename file.\r\n");
 }
 
 void command_rnto(char* args, Session* state) {
@@ -158,13 +157,13 @@ void command_rnto(char* args, Session* state) {
         return;
     }
     if (state->rename_from == NULL) {
-        send_message(state, "550 No file is specified.\n");
+        send_message(state, "550 No file is specified.\r\n");
     }
     else if (rename(state->rename_from, args) == -1) {
-        send_message(state, "550 Fail to rename file.\n");
+        send_message(state, "550 Fail to rename file.\r\n");
     }
     else 
-        send_message(state, "250 Rename file successfully.\n");
+        send_message(state, "250 Rename file successfully.\r\n");
     free(state->rename_from); state->rename_from = NULL;
 }
 
@@ -174,10 +173,10 @@ void command_dele(char* args, Session* state) {
         return;
     }
     if (unlink(args) == 0) {
-        send_message(state, "250 Delete file successfully.\n");
+        send_message(state, "250 Delete file successfully.\r\n");
     }
     else {
-        send_message(state, "550 Fail to delete file.\n");
+        send_message(state, "550 Fail to delete file.\r\n");
     }
 }
 
@@ -187,9 +186,9 @@ void command_cdup(char* args, Session* state) {
         return;
     }
     if(chdir("..") == -1) {
-        send_message(state, "550 Fail to change directory.\n");
+        send_message(state, "550 Fail to change directory.\r\n");
     }
     else {
-        send_message(state, "250 Change directory successfully.\n");
+        send_message(state, "250 Change directory successfully.\r\n");
     }
 }

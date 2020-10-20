@@ -41,8 +41,8 @@ int create_socket(int port, Session* state)
         return -1;
     }
     if (state != NULL) {
-        if (state->sock_addr != NULL) free(state->sock_addr);
-        state->sock_addr = sock_addr;
+        if (state->pasv_addr != NULL) free(state->pasv_addr);
+        state->pasv_addr = sock_addr;
     }
     else
         free(sock_addr);

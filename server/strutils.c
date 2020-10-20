@@ -2,7 +2,7 @@
 
 void check_root_permission() {
     if (geteuid() != 0) {
-        fprintf(stderr, "Wrong: FTP Server need root permission to work!\n");
+        fprintf(stderr, "Wrong: FTP Server need root permission to work!\r\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -13,7 +13,7 @@ void read_config() {
     FILE* pf = NULL;
     pf = fopen(filename, "r");
     if (pf == NULL) {
-        fprintf(stderr, "Wrong: Fail to open config file config.conf\n");
+        fprintf(stderr, "Wrong: Fail to open config file config.conf\r\n");
         exit(EXIT_FAILURE);
     }
     while (!feof(pf)) {
@@ -70,7 +70,7 @@ void read_config() {
             config.custom_num_user += 1;
         }
         else {
-            printf("Wrong: has no attribute %s!\n", key);
+            printf("Wrong: has no attribute %s!\r\n", key);
         }
     }
 
@@ -83,7 +83,7 @@ void get_paras(int argc, char *argv[]) {
         {
             case 0:break;
             case 'h': {
-                printf("Usage: sudo ./ftpServer --port 12306 --root ./spb/tmp\n");
+                printf("Usage: sudo ./ftpServer --port 12306 --root ./spb/tmp\r\n");
                 exit(0);
             }
             case 'p': {

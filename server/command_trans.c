@@ -5,24 +5,33 @@ void command_retr(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    printf("command_retr begin\n");
+    if (strstr(args, "../") != NULL) {
+        send_message(state, "550 Permission denied.\r\n");
+        return ;
+    }
+    if (access(args, F_OK) != 0) {
+        send_message(state, "550 No such file or directory.\r\n");
+        return ;
+    }
 
     FILE* fp = fopen(args, "r");
     if (fp == NULL) {
-        send_message(state, "550 No such file or directory.\n");
+        send_message(state, "551 Permission denied.\r\n");
         return ;
     }
 
     if (state->mode == NORMAL) {
-        send_message(state, "425 Use PORT or PASV first.\n");
+        send_message(state, "425 Use PORT or PASV first.\r\n");
         return;
     }
     update_data_trans_fd(state);
     if (state->data_trans_fd <= 0) {
-        send_message(state, "425 Fail to establish connection.\n");
+        send_message(state, "425 Fail to establish connection.\r\n");
         return;
     }
-    send_message(state, "150 Opening data connection.\n");
+    send_message(state, "150 Opening data connection.\r\n");
+
+    state->is_trans_data = 1;
 
     char buffer[BUFFER_LENGTH] = { 0 };
     while (!feof(fp)) {
@@ -30,15 +39,20 @@ void command_retr(char* args, Session* state) {
         int bytes = send(state->data_trans_fd, buffer, strlen(buffer), 0);
         state->trans_file_bytes += bytes;
         state->trans_all_bytes += bytes;
+        if (bytes < strlen(buffer)) {
+            send_message(state, "426 Data connection error.\r\n");
+            state->is_trans_data = 0;
+            fclose(fp); close_trans_conn(state);
+            return;
+        }
         memset(buffer, 0, BUFFER_LENGTH);
     }
 
-    fclose(fp);
-    send_message(state, "226 Transfer complete.\n");
+    state->is_trans_data = 0;
+    fclose(fp); close_trans_conn(state);
+
+    send_message(state, "226 Transfer complete.\r\n");
     state->trans_file_num += 1;
-    
-    close_trans_conn(state);
-    printf("command_retr end\n");
 }
 
 void command_stor(char* args, Session* state) {
@@ -46,29 +60,35 @@ void command_stor(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
+    if (strstr(args, "../") != NULL) {
+        send_message(state, "550 Permission denied.\r\n");
+        return ;
+    }
     
     FILE* fp = fopen(args, "w");
     if (fp == NULL) {
-        send_message(state, "550 No such file or directory.\n");
+        send_message(state, "551 Permission denied.\r\n");
         return ;
     }
 
     if (state->mode == NORMAL) {
-        send_message(state, "425 Use PORT or PASV first.\n");
+        send_message(state, "425 Use PORT or PASV first.\r\n");
         return;
     }
     update_data_trans_fd(state);
     if (state->data_trans_fd <= 0) {
-        send_message(state, "425 Fail to establish connection.\n");
+        send_message(state, "425 Fail to establish connection.\r\n");
         return;
     }
-    send_message(state, "150 Opening data connection.\n");
+    send_message(state, "150 Opening data connection.\r\n");
 
     char buffer[BUFFER_LENGTH] = { 0 };
     int recv_length = 0, write_length = 0;
+    state->is_trans_data = 1;
     while (recv_length = recv(state->data_trans_fd, buffer, BUFFER_LENGTH, 0)) {
         if (recv_length < 0) {
-            send_message(state, "426 Data connection error.\n");
+            send_message(state, "426 Data connection error.\r\n");
+            state->is_trans_data = 0;
             fclose(fp); close_trans_conn(state);
             return;
         }
@@ -76,15 +96,17 @@ void command_stor(char* args, Session* state) {
         state->trans_all_bytes += recv_length;
         write_length = fwrite(buffer, sizeof(char), recv_length, fp);
         if (write_length < recv_length) {
-            send_message(state, "551 Error on output file.\n");
+            state->is_trans_data = 0;
+            send_message(state, "426 Data connection error.\r\n");
             fclose(fp); close_trans_conn(state);
             return;
         }
         memset(buffer, 0, BUFFER_LENGTH);
     }
-    send_message(state, "226 Transfer complete.\n");
+
+    state->is_trans_data = 0;
+    fclose(fp); close_trans_conn(state);
+
+    send_message(state, "226 Transfer complete.\r\n");
     state->trans_file_num += 1;
-    
-    fclose(fp);
-    close_trans_conn(state);
 }

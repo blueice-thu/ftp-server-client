@@ -12,11 +12,11 @@ int main(int argc, char *argv[]) {
     int ip[4] = { 0 };
     get_local_ip(listen_fd, ip);
 
-    printf("FTP server start!\n");
-    printf("listen_port: %u\n", config.listen_port);
-    printf("listen_address: %d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
-    printf("root_path: %s\n", config.root_path);
-    printf("listen_fd: %d\n", listen_fd);
+    printf("FTP server start!\r\n");
+    printf("listen_port: %u\r\n", config.listen_port);
+    printf("listen_address: %d.%d.%d.%d\r\n", ip[0], ip[1], ip[2], ip[3]);
+    printf("root_path: %s\r\n", config.root_path);
+    printf("listen_fd: %d\r\n", listen_fd);
 
     receive_request(listen_fd);
     close(listen_fd);

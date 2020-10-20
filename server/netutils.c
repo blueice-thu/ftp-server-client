@@ -3,7 +3,7 @@
 
 int create_ftp_server() {
     if(chroot(config.root_path) !=0 ) {
-        printf("%s: %s\n", config.root_path, strerror(errno));
+        printf("%s: %s\r\n", config.root_path, strerror(errno));
         exit(EXIT_FAILURE);
     }
     int listen_fd = create_socket(config.listen_port, NULL);
@@ -34,11 +34,11 @@ void* process_request(void* client_descriptor) {
     state->user_index = -1;
     state->sockfd = sockfd;
 
-    send_message(state, "220 Anonymous FTP server ready.\n");
+    send_message(state, "220 Anonymous FTP server ready.\r\n");
     
     int read_bytes = read(sockfd, buffer, BUFFER_LENGTH);
     while (read_bytes > 0 && read_bytes <= BUFFER_LENGTH) {
-        printf("Command: %s\n", buffer);
+        printf("Command: %s\r\n", buffer);
         sscanf(buffer,"%s %s", command, args);
         process_command(command, args, state);
         memset(buffer, '\0', sizeof(char) * BUFFER_LENGTH);
@@ -48,9 +48,9 @@ void* process_request(void* client_descriptor) {
     }
 
     close(sockfd);
-    if (state->sock_addr) free(state->sock_addr);
+    if (state->pasv_addr) free(state->pasv_addr);
     free(state);
-    printf("Client disconnected!\n");
+    printf("Client disconnected!\r\n");
 
     return NULL;
 }
@@ -63,6 +63,10 @@ void process_command(char* command, char* args, Session* state) {
             command_index = i;
             break;
         }
+    }
+    if (state->is_trans_data == 1 && command_index != ABOR && command_index != QUIT) {
+        send_message(state, "421 Data transfering and refuse control command.\r\n");
+        return;
     }
     switch (command_index) {
         case USER:  command_user(args, state);  break;
@@ -85,7 +89,7 @@ void process_command(char* command, char* args, Session* state) {
         case DELE:  command_dele(args, state);  break;
         case CDUP:  command_cdup(args, state);  break;
         default: {
-            send_message(state, "500 Unknown command.\n");
+            send_message(state, "500 Unknown command.\r\n");
             break;
         }
     }

@@ -27,21 +27,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
-static const char need_password_msg[] = "331 Guest login ok, send your complete e-mail address as password.\n";
-static const char user_invaild_msg[] = "530 Invalid username.\n";
-static const char need_login_msg[] = "530 Need login.\n";
-static const char login_succeed_msg[] = "230 Login succeed.\n";
-static const char wrong_password_msg[] = "530 Wrong password.\n";
-static const char passive_msg[] = "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).\n";
-static const char need_passive_msg[] = "550 Please Use Passive Mode.\n";
-static const char open_data_conn_msg[] = "150 Read file OK and ready to open data transfer connection.\n";
-static const char fail_read_file_msg[] = "451 Failed to read file.\n";
-static const char send_file_ok_msg[] = "226 Send file successfully.\n";
-static const char fail_tcp_conn_msg[] = "425 Fail to establish TCP connection.\n";
-static const char network_fail_msg[] = "426 Network terminated.\n";
-
-static const char no_file_msg[] = "550 No such file or directory.\n";
-static const char no_permis_msg[] = "550 Permission denied.\n";
+static const char need_login_msg[] = "530 Need login.\r\n";
+static const char no_file_msg[] = "550 No such file or directory.\r\n";
+static const char no_permis_msg[] = "550 Permission denied.\r\n";
 
 #define BUFFER_LENGTH   1024    // Length of data buffer to transfer data
 #define COMMAND_LENGTH  8       // Maximum length of command
@@ -87,9 +75,9 @@ typedef enum SessionMode {
 typedef struct Session {
     int user_index;
     int is_logged;          // Login status
-    SockAddrIn* sock_addr;
     int sock_pasv;
     SessionMode mode;       // Work mode restricted in SessionMode
+    SockAddrIn* pasv_addr;
     SockAddrIn *port_addr;
     int sockfd;             // Sockfd for transfering message
     int data_trans_fd;      // Sockfd for transfering file
