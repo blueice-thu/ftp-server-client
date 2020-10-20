@@ -15,6 +15,10 @@ void command_user(char* args, Session* state) {
 }
 
 void command_pass(char* args, Session* state) {
+    //TODO
+    send_message(state, "230 User logged in, proceed.\r\n");
+    state->is_logged = 1;
+    return;
     if (state->is_logged == 1) {
         send_message(state, "202 Already logged in.\r\n");
         return;

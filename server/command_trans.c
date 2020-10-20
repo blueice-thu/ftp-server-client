@@ -14,7 +14,7 @@ void command_retr(char* args, Session* state) {
         return ;
     }
 
-    FILE* fp = fopen(args, "r");
+    FILE* fp = fopen(args, "rb");
     if (fp == NULL) {
         send_message(state, "551 Permission denied.\r\n");
         return ;
@@ -35,16 +35,10 @@ void command_retr(char* args, Session* state) {
 
     char buffer[BUFFER_LENGTH] = { 0 };
     while (!feof(fp)) {
-        fgets(buffer, BUFFER_LENGTH, fp);
-        int bytes = send(state->data_trans_fd, buffer, strlen(buffer), 0);
-        state->trans_file_bytes += bytes;
-        state->trans_all_bytes += bytes;
-        if (bytes < strlen(buffer)) {
-            send_message(state, "426 Data connection error.\r\n");
-            state->is_trans_data = 0;
-            fclose(fp); close_trans_conn(state);
-            return;
-        }
+        int read_bytes = fread(buffer, sizeof(char), BUFFER_LENGTH - 1, fp);
+        int send_bytes = send(state->data_trans_fd, buffer, read_bytes, 0);
+        state->trans_file_bytes += send_bytes;
+        state->trans_all_bytes += send_bytes;
         memset(buffer, 0, BUFFER_LENGTH);
     }
 
@@ -65,7 +59,7 @@ void command_stor(char* args, Session* state) {
         return ;
     }
     
-    FILE* fp = fopen(args, "w");
+    FILE* fp = fopen(args, "wb");
     if (fp == NULL) {
         send_message(state, "551 Permission denied.\r\n");
         return ;
@@ -85,7 +79,8 @@ void command_stor(char* args, Session* state) {
     char buffer[BUFFER_LENGTH] = { 0 };
     int recv_length = 0, write_length = 0;
     state->is_trans_data = 1;
-    while (recv_length = recv(state->data_trans_fd, buffer, BUFFER_LENGTH, 0)) {
+    recv_length = recv(state->data_trans_fd, buffer, BUFFER_LENGTH, 0);
+    while (recv_length) {
         if (recv_length < 0) {
             send_message(state, "426 Data connection error.\r\n");
             state->is_trans_data = 0;
@@ -102,6 +97,7 @@ void command_stor(char* args, Session* state) {
             return;
         }
         memset(buffer, 0, BUFFER_LENGTH);
+        recv_length = recv(state->data_trans_fd, buffer, BUFFER_LENGTH, 0);
     }
 
     state->is_trans_data = 0;

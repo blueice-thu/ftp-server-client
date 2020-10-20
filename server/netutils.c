@@ -56,9 +56,8 @@ void* process_request(void* client_descriptor) {
 }
 
 void process_command(char* command, char* args, Session* state) {
-    int cmdlist_count = sizeof(cmdlistStr) / sizeof(char *);
     int command_index = -1;
-    for (int i = 0; i < cmdlist_count; i++) {
+    for (int i = 0; i < SUPPORTED_CMD_COUNT; i++) {
         if (strcmp(command, cmdlistStr[i]) == 0) {
             command_index = i;
             break;

@@ -27,9 +27,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
-static const char need_login_msg[] = "530 Need login.\r\n";
-static const char no_file_msg[] = "550 No such file or directory.\r\n";
-static const char no_permis_msg[] = "550 Permission denied.\r\n";
+extern const char need_login_msg[];
+extern const char no_file_msg[];
+extern const char no_permis_msg[];
 
 #define BUFFER_LENGTH   1024    // Length of data buffer to transfer data
 #define COMMAND_LENGTH  8       // Maximum length of command
@@ -39,6 +39,8 @@ static const char no_permis_msg[] = "550 Permission denied.\r\n";
 #define PATH_LENGTH     256     // Maximum length of server path
 #define MSG_LENGTH      512     // Maximum length of a message
 #define TIMEOUT         20      // Seconds
+
+#define SUPPORTED_CMD_COUNT 19
 
 typedef struct sockaddr_in SockAddrIn;
 typedef struct sockaddr SockAddr;
@@ -54,18 +56,13 @@ typedef struct Config {
 } Config;
 
 extern Config config;
+extern const char *cmdlistStr[];
 
 // Supported ftp commands
 typedef enum cmdlist { 
     USER, PASS, RETR, STOR, QUIT, SYST, TYPE, PORT, PASV,
     MKD, CWD, PWD, LIST, RMD, RNFR, RNTO, ABOR, DELE, CDUP
 } cmdlist;
-
-static const char *cmdlistStr[] = 
-{
-    "USER", "PASS", "RETR", "STOR", "QUIT", "SYST", "TYPE", "PORT", "PASV",
-    "MKD", "CWD", "PWD", "LIST", "RMD", "RNFR", "RNTO", "ABOR", "DELE", "CDUP"
-};
 
 typedef enum SessionMode { 
     NORMAL, PASSIVE, ACTIVE
@@ -105,7 +102,11 @@ void send_message(Session* state, const char* msg);
 */
 int create_socket(int port, Session* state);
 
-void get_local_ip(int sockfd, int* ip);
+/**
+* Create a socket. Bind and listen.
+* @param ip A 4-integer list to store ip
+*/
+void get_local_ip(int* ip);
 
 /**
 * Update Session.data_trans_fd according to work mode

@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
     int listen_fd = create_ftp_server();
 
     int ip[4] = { 0 };
-    get_local_ip(listen_fd, ip);
+    get_local_ip(ip);
 
     printf("FTP server start!\r\n");
     printf("listen_port: %u\r\n", config.listen_port);

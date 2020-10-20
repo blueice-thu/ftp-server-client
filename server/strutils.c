@@ -8,6 +8,7 @@ void check_root_permission() {
 }
 
 void read_config() {
+    memset(&config, 0, sizeof(config));
     const char filename[] = "config.conf";
     char line[MAX_LINE_LENGTH_CONFIG] = {0};
     FILE* pf = NULL;

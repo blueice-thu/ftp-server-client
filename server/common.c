@@ -2,6 +2,16 @@
 
 Config config;
 
+const char need_login_msg[] = "530 Need login.\r\n";
+const char no_file_msg[] = "550 No such file or directory.\r\n";
+const char no_permis_msg[] = "550 Permission denied.\r\n";
+
+const char *cmdlistStr[] = 
+{
+    "USER", "PASS", "RETR", "STOR", "QUIT", "SYST", "TYPE", "PORT", "PASV",
+    "MKD", "CWD", "PWD", "LIST", "RMD", "RNFR", "RNTO", "ABOR", "DELE", "CDUP"
+};
+
 void send_message(Session* state, const char* msg) {
     int bytes = strlen(msg);
     state->trans_all_bytes += bytes;
@@ -49,15 +59,22 @@ int create_socket(int port, Session* state)
     return sockfd;
 }
 
-void get_local_ip(int sockfd, int* ip) {
-    SockAddrIn addr;
-    socklen_t addr_size = sizeof(SockAddrIn);
-    getsockname(sockfd, (SockAddr *)&addr, &addr_size);
-    int host = addr.sin_addr.s_addr;
-    for (int i = 0; i < 4; i++) 
-        ip[i] = (host >> i * 8) & 0xff;
-}
+void get_local_ip(int* ip) {
+    char ip_str[32] = { 0 };
+    int listenfd = socket(AF_INET, SOCK_DGRAM, 0);
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(80);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    inet_pton(AF_INET, "8.8.8.8", &(addr.sin_addr.s_addr));
+    connect(listenfd, (struct sockaddr *)&(addr), sizeof(addr));
 
+    socklen_t n = sizeof addr;
+    getsockname(listenfd, (struct sockaddr *)&addr, &n);
+    inet_ntop(AF_INET, &(addr.sin_addr), ip_str, INET_ADDRSTRLEN);
+    sscanf(ip_str, "%d.%d.%d.%d", &ip[0], &ip[1], &ip[2], &ip[3]);
+}
 void update_data_trans_fd(Session* state) {
     if (state->mode == ACTIVE) {
         int status = connect(state->data_trans_fd, (SockAddr*)(state->port_addr), sizeof(SockAddr));

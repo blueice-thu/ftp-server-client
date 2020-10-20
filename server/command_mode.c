@@ -6,7 +6,7 @@ void command_type(char* args, Session* state) {
         return;
     }
     if(strcmp(args, "I") == 0) {
-        send_message(state, "200 Switching to Binary mode.\r\n");
+        send_message(state, "200 Type set to I.\r\n");
     }
     else {
         send_message(state, "501 Syntax error.\r\n");
@@ -61,7 +61,7 @@ void command_pasv(char* args, Session* state) {
 
     char msg[MSG_LENGTH] = { '\0' };
     int ip[4] = { 0 };
-    get_local_ip(state->sockfd, ip);
+    get_local_ip(ip);
     int port = (int)(ntohs(sock_addr->sin_port));
     int port1 = port / 256;
     int port2 = port % 256;
