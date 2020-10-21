@@ -41,20 +41,23 @@ def test(port=21, directory='/tmp'):
   if port == 21 and directory == '/tmp':
     server = subprocess.Popen('./server', stdout=subprocess.PIPE)
   else:
-    server = subprocess.Popen(['./server', '-port', '%d' % port, '-root', directory], stdout=subprocess.PIPE)
+    print 'port = ', port, ' root = ', directory
+    server = subprocess.Popen(['./server', '--port', '%d' % port, '--root', directory], stdout=subprocess.PIPE)
   time.sleep(0.1)
   try:
     ftp = FTP()
     # connect
+    print 'connect'
     if not ftp.connect('127.0.0.1', port).startswith('220'):
       print 'You missed response 220'
       credit -= minor
     # login
+    print 'login'
     if not ftp.login().startswith('230'):
       print 'You missed response 230'
       credit -= minor
     # SYST
-    if ftp.sendcmd('SYST') != '215 UNIX Type: L8':
+    if ftp.sendcmd('SYST') != '215 UNIX Type: L8.':
       print 'Bad response for SYST'
       credit -= minor
     # TYPE
@@ -92,6 +95,7 @@ def test(port=21, directory='/tmp'):
       print 'Bad response for QUIT'
       credit -= minor
     ftp2.quit()
+    print 'quit, credit = ', credit
   except Exception as e:
     print 'Exception occurred:', e
     credit = 0
@@ -99,7 +103,7 @@ def test(port=21, directory='/tmp'):
 
 build()
 # Test 1
-test()
+# test()
 # Test 2
 port = random.randint(2000, 3000)
 directory = ''.join(random.choice(string.ascii_letters) for x in xrange(10))

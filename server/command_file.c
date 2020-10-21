@@ -5,10 +5,20 @@ void command_mkd(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if (access(args, F_OK) == 0) {
+    
+    char real_work_dir[PATH_LENGTH] = { '\0' };
+    char full_dir_path[PATH_LENGTH] = { '\0' };
+    join_path(config.root_path, state->work_dir, real_work_dir);
+    int join_status = join_path(real_work_dir, args, full_dir_path);
+
+    if (join_status == 0 || is_valid_path(real_work_dir) == 0) {
+        send_message(state, "550 Fail to create directory.\r\n");
+        return;
+    }
+    if (access(full_dir_path, F_OK) == 0) {
         send_message(state, "550 Folder already exists.\r\n");
     }
-    else if (mkdir(args, 0777) == -1) {
+    else if (mkdir(full_dir_path, 0777) == -1) {
         send_message(state, "550 Fail to create directory.\r\n");
     }
     else {
@@ -25,11 +35,23 @@ void command_cwd(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if(chdir(args) == -1) {
+    char full_args_path[PATH_LENGTH] = { '\0' };
+    int join_status = get_args_full_path(state, args, full_args_path);
+
+    struct stat st;
+    stat(full_args_path, &st);
+
+    if (join_status == 0 || access(full_args_path, F_OK) == -1 || !S_ISDIR(st.st_mode)) {
         send_message(state, "550 No such directory.\r\n");
     }
+    else if (is_valid_path(full_args_path) == 0) {
+        send_message(state, no_permis_msg);
+    }
     else {
-        send_message(state, "250 Change directory successfully.\r\n");
+        char new_work_dir[PATH_LENGTH] = { '\0' };
+        join_path(state->work_dir, args, new_work_dir);
+        strcpy(state->work_dir, new_work_dir);
+        send_message(state, "250 Command okay.\r\n");
     }
 }
 
@@ -38,26 +60,36 @@ void command_pwd(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    
-    char work_path[PATH_LENGTH] = { '\0' };
-    if (getcwd(work_path, PATH_LENGTH) != NULL) {
-        char msg[MSG_LENGTH] = { '\0' };
-        strcat(msg, "257 \"");
-        strcat(msg, work_path);
-        strcat(msg, "\"\r\n");
-        send_message(state, need_login_msg);
-    }
-    else {
-        send_message(state, "550 Failed to get pwd.\r\r\n");
-    }
+    char msg[MSG_LENGTH] = { '\0' };
+    strcat(msg, "257 \"");
+    strcat(msg, state->work_dir);
+    strcat(msg, "\"\r\n");
+    send_message(state, msg);
 }
 
 void command_list(char* args, Session* state) {
-    // TODO
     if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
+
+    char real_dir[PATH_LENGTH] = { '\0' };
+    int join_status = join_path(config.root_path, state->work_dir, real_dir);
+
+    if (join_status == 0) {
+        send_message(state, "551 File listing failed.\r\n");
+    }
+
+    if (real_dir[strlen(real_dir - 1)] != '/')
+        strcat(real_dir, "/");
+
+    chdir(real_dir);
+    DIR* dir_ptr = opendir(".");
+    if (dir_ptr == NULL) {
+        send_message(state, "551 File listing failed.\r\n");
+        return ;
+    }
+
     update_data_trans_fd(state);
     if (state->mode == NORMAL) {
         send_message(state, "425 Use PORT or PASV first.\r\n");
@@ -68,11 +100,7 @@ void command_list(char* args, Session* state) {
         return;
     }
     send_message(state, "150 Opening data connection.\r\n");
-    DIR* dir_ptr = opendir(".");
-    if (dir_ptr == NULL) {
-        send_message(state, "551 File listing failed.\r\n");
-        return ;
-    }
+
     struct dirent *dr;
     while((dr = readdir(dir_ptr)))
     {
@@ -94,10 +122,10 @@ void command_list(char* args, Session* state) {
     }
     state->trans_all_num += 1;
     closedir(dir_ptr);
+    chdir(config.root_path);
         
     close_trans_conn(state);
     send_message(state, "226 Closing data connection.\r\n");
-    
 }
 
 static int rmFiles(const char *pathname, const struct stat *sbuf, int type, struct FTW *ftwb)
@@ -111,14 +139,18 @@ static int rmFiles(const char *pathname, const struct stat *sbuf, int type, stru
 }
 
 void command_rmd(char* args, Session* state) {
-    // TODO
     if (state->is_logged == 0) {
         send_message(state, need_login_msg);
         return;
     }
+
+    char full_args_path[PATH_LENGTH] = { '\0' };
+    int join_status = get_args_full_path(state, args, full_args_path);
+
     struct stat st;
-    stat(args, &st);
-    if (access(args, F_OK) == -1 || !S_ISDIR(st.st_mode)) {
+    stat(full_args_path, &st);
+
+    if (join_status == 0 || access(full_args_path, F_OK) == -1 || !S_ISDIR(st.st_mode)) {
         send_message(state, "550 Not a valid directory.\r\n");
     }
     else if (nftw(args, rmFiles, 10, FTW_DEPTH | FTW_MOUNT | FTW_PHYS) < 0) {
@@ -135,20 +167,23 @@ void command_rnfr(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if (access(args, R_OK) == -1) {
-        send_message(state, no_file_msg);
-        return;
-    }
-    if (access(args, W_OK) == -1) {
-        send_message(state, no_permis_msg);
-        return;
-    }
-    if (state->rename_from) 
-        free(state->rename_from);
-    state->rename_from = (char*)malloc(PATH_LENGTH);
-    strcpy(state->rename_from, args);
 
-    send_message(state, "350 Ready to rename file.\r\n");
+    char full_args_path[PATH_LENGTH] = { '\0' };
+    int join_status = get_args_full_path(state, args, full_args_path);
+
+    if (join_status || access(full_args_path, R_OK) == -1) {
+        send_message(state, no_file_msg);
+    }
+    else if (access(args, W_OK) == -1) {
+        send_message(state, no_permis_msg);
+    }
+    else {
+        state->rename_state = 1;
+        if (state->rename_from) free(state->rename_from);
+        state->rename_from = (char*)malloc(PATH_LENGTH);
+        send_message(state, "350 Ready to rename file.\r\n");
+        strcpy(state->rename_from, full_args_path);
+    }
 }
 
 void command_rnto(char* args, Session* state) {
@@ -156,15 +191,24 @@ void command_rnto(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if (state->rename_from == NULL) {
+    if (state->rename_from == NULL || state->rename_state == 0) {
         send_message(state, "550 No file is specified.\r\n");
+        return;
     }
-    else if (rename(state->rename_from, args) == -1) {
+
+    char full_args_path[PATH_LENGTH] = { '\0' };
+    int join_status = get_args_full_path(state, args, full_args_path);
+
+    if (join_status == 0 || rename(state->rename_from, full_args_path) == -1) {
         send_message(state, "550 Fail to rename file.\r\n");
     }
-    else 
+    else {
         send_message(state, "250 Rename file successfully.\r\n");
-    free(state->rename_from); state->rename_from = NULL;
+    }
+
+    free(state->rename_from);
+    state->rename_state = 0;
+    state->rename_from = NULL;
 }
 
 void command_dele(char* args, Session* state) {
@@ -172,11 +216,14 @@ void command_dele(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if (unlink(args) == 0) {
-        send_message(state, "250 Delete file successfully.\r\n");
+    char full_args_path[PATH_LENGTH] = { '\0' };
+    int join_status = get_args_full_path(state, args, full_args_path);
+    
+    if (join_status == 0 || unlink(full_args_path) == -1) {
+        send_message(state, "550 Fail to delete file.\r\n");
     }
     else {
-        send_message(state, "550 Fail to delete file.\r\n");
+        send_message(state, "250 Delete file successfully.\r\n");
     }
 }
 
@@ -185,10 +232,5 @@ void command_cdup(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if(chdir("..") == -1) {
-        send_message(state, "550 Fail to change directory.\r\n");
-    }
-    else {
-        send_message(state, "250 Change directory successfully.\r\n");
-    }
+    command_cwd("..", state);
 }

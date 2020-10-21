@@ -17,3 +17,9 @@
 # linux FTP命令
 
 - `passive`：切换被动模式
+
+# Run test
+
+```python
+sudo python2 autograde.py
+```

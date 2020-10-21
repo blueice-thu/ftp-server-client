@@ -36,7 +36,7 @@ extern const char no_permis_msg[];
 #define ARGS_LENGTH     128     // Maximum length of parameter
 #define USERNAME_LENGTH 32      // Maximum length of usename
 #define PASSWORD_LENGTH 32      // Maximum length of password
-#define PATH_LENGTH     256     // Maximum length of server path
+#define PATH_LENGTH     512     // Maximum length of server path
 #define MSG_LENGTH      512     // Maximum length of a message
 #define TIMEOUT         20      // Seconds
 
@@ -48,7 +48,7 @@ typedef struct sockaddr SockAddr;
 typedef struct Config {
     unsigned int listen_port;
     char* listen_address;
-    char* root_path;
+    char root_path[PATH_LENGTH];
     int num_user;
     int custom_num_user;
     char** username_table;
@@ -81,6 +81,9 @@ typedef struct Session {
     int is_trans_data;      // State of transfering data
 
     char* rename_from;
+    int rename_state;
+
+    char work_dir[PATH_LENGTH];
     
     int trans_file_num;     // File number that sended and received
     int trans_file_bytes;   // File bytes that sended and received
@@ -131,5 +134,11 @@ int search_username(const char* username);
 int check_password(int index, const char* password);
 
 void free_config();
+
+int join_path(char* parent, char* child, char* result);
+
+int is_valid_path(char* path);
+
+int get_args_full_path(Session* state, char* args, char* result);
 
 #endif

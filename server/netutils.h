@@ -8,9 +8,6 @@
 #include "command_mode.h"
 #include "command_trans.h"
 
-// Create server and return sockfd
-int create_ftp_server();
-
 /**
 * Accept new client request and create thread for every client
 * @param listen_fd Sockfd listening from client

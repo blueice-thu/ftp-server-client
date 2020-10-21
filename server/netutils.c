@@ -1,15 +1,5 @@
 #include "netutils.h"
 
-
-int create_ftp_server() {
-    if(chroot(config.root_path) !=0 ) {
-        printf("%s: %s\r\n", config.root_path, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    int listen_fd = create_socket(config.listen_port, NULL);
-    return listen_fd;
-}
-
 void receive_request(int listen_fd) {
     SockAddrIn client_address;
     socklen_t length = sizeof(client_address);
@@ -23,8 +13,6 @@ void receive_request(int listen_fd) {
 }
 
 void* process_request(void* client_descriptor) {
-    chdir("/");
-
     char command[COMMAND_LENGTH] = {'\0'};
     char args[ARGS_LENGTH] = {'\0'};
     char buffer[BUFFER_LENGTH] = {'\0'};
@@ -33,6 +21,7 @@ void* process_request(void* client_descriptor) {
     Session* state = (Session*)calloc(1, sizeof(Session));
     state->user_index = -1;
     state->sockfd = sockfd;
+    strcpy(state->work_dir, "/");
 
     send_message(state, "220 Anonymous FTP server ready.\r\n");
     

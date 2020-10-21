@@ -5,16 +5,15 @@ void command_retr(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if (strstr(args, "../") != NULL) {
-        send_message(state, "550 Permission denied.\r\n");
-        return ;
-    }
-    if (access(args, F_OK) != 0) {
+    char full_args_path[PATH_LENGTH] = { '\0' };
+    int join_status = get_args_full_path(state, args, full_args_path);
+
+    if (join_status == 0 || access(full_args_path, F_OK) == -1) {
         send_message(state, "550 No such file or directory.\r\n");
         return ;
     }
 
-    FILE* fp = fopen(args, "rb");
+    FILE* fp = fopen(full_args_path, "rb");
     if (fp == NULL) {
         send_message(state, "551 Permission denied.\r\n");
         return ;
@@ -54,13 +53,11 @@ void command_stor(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if (strstr(args, "../") != NULL) {
-        send_message(state, "550 Permission denied.\r\n");
-        return ;
-    }
+    char full_args_path[PATH_LENGTH] = { '\0' };
+    int join_status = get_args_full_path(state, args, full_args_path);
     
-    FILE* fp = fopen(args, "wb");
-    if (fp == NULL) {
+    FILE* fp = fopen(full_args_path, "wb");
+    if (join_status == 0 || fp == NULL) {
         send_message(state, "551 Permission denied.\r\n");
         return ;
     }

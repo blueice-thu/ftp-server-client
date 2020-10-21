@@ -58,7 +58,11 @@ void read_config() {
             config.listen_address = strdup(value);
         }
         else if (strcmp(key, "root_path") == 0) {
-            config.root_path = strdup(value);
+            if(chdir(value) !=0 ) {
+                printf("%s: %s\r\n", config.root_path, strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+            getcwd(config.root_path, PATH_LENGTH);
         }
         else if (strcmp(key, "num_user") == 0) {
             config.num_user = atoi(value);
@@ -84,7 +88,7 @@ void get_paras(int argc, char *argv[]) {
         {
             case 0:break;
             case 'h': {
-                printf("Usage: sudo ./ftpServer --port 12306 --root ./spb/tmp\r\n");
+                printf("Usage: sudo ./ftpServer --port 21 --root /tmp\r\n");
                 exit(0);
             }
             case 'p': {
@@ -92,8 +96,12 @@ void get_paras(int argc, char *argv[]) {
                 break;
             }
             case 'r': {
-                if (config.root_path) free(config.root_path);
-                config.root_path = strdup(optarg);
+                if(chdir(optarg) !=0 ) {
+                    printf("%s: %s\r\n", optarg, strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
+                memset(config.root_path, 0, sizeof(config.root_path));
+                getcwd(config.root_path, PATH_LENGTH);
                 break;
             }
         }
