@@ -2,7 +2,7 @@
 #include "netutils.h"
 
 int main(int argc, char *argv[]) {
-    // check_root_permission();
+    check_root_permission();
 
     read_config();
     get_paras(argc, argv);
