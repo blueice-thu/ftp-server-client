@@ -10,18 +10,16 @@
 void check_root_permission();
 
 /**
-* Read parament configs from config.conf
-* @param config A config struct pointer to store
+* Read parament configs from config.conf and store in global config
 */
 void read_config();
 
 /**
-* Read paraments from opts. 
+* Read paraments from opts and store in global config.
 * It will overwrite config from config.conf.
 * Support: -port, -root
 * @param argc Number of parameters
 * @param argv String list of parameters
-* @param config A config struct pointer to store
 */
 void get_paras(int argc, char *argv[]);
 

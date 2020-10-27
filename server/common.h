@@ -134,12 +134,23 @@ int search_username(const char* username);
 */
 int check_password(int index, const char* password);
 
+// Free the memory of pointers in config
 void free_config();
 
+/**
+* Join parent and child paths CORRECTLY and store result. 
+* Example 1: parent = "/tmp1", child = "/tmp2" => result = "/tmp1/tmp2". 
+* Example 2: parent = "/tmp1/tmp2", child = "../tmp3" => result = "/tmp1/tmp3".
+* @param parent Path prefix
+* @param child Path suffix
+* @param result If NULL, this function will apply a memory for result
+*/
 int join_path(char* parent, char* child, char* result);
 
+// Check whether path is allowed access according to root_path
 int is_valid_path(char* path);
 
+// Generate full path by joining root_path, work_dir and args
 int get_args_full_path(Session* state, char* args, char* result);
 
 #endif
