@@ -57,6 +57,7 @@ typedef struct Config {
 
 extern Config config;
 extern const char *cmdlistStr[];
+extern char code_path[PATH_LENGTH];
 
 // Supported ftp commands
 typedef enum cmdlist { 

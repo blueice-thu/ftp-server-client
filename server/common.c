@@ -12,6 +12,8 @@ const char *cmdlistStr[] =
     "MKD", "CWD", "PWD", "LIST", "RMD", "RNFR", "RNTO", "ABOR", "DELE", "CDUP"
 };
 
+char code_path[PATH_LENGTH] = { '\0' };
+
 void send_message(Session* state, const char* msg) {
     int bytes = strlen(msg);
     state->trans_all_bytes += bytes;

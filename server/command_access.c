@@ -48,7 +48,7 @@ void command_quit(char* args, Session* state) {
 }
 
 void command_syst(char* args, Session* state) {
-    send_message(state, "215 UNIX Type: L8.\r\n");
+    send_message(state, "215 UNIX Type: L8\r\n");
 }
 
 void command_abor(char* args, Session* state) {

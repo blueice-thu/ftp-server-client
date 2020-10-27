@@ -1,9 +1,9 @@
 # FTP Server
 
 - 编译：`make`
-- 运行：`sudo ./ftpServer --port 12306 --root ./spb/tmp`
+- 运行：`sudo ./server -port 12306 -root /tmp`
 - 清理：`make clean`
-- 整合：`make clean; make; sudo ./ftpServer --port 12306 --root ./spb`
+- 整合：`make clean; make; sudo ./server -port 12306 -root /tmp`
 
 # linux命令
 

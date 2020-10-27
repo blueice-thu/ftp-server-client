@@ -82,27 +82,34 @@ void read_config() {
 }
 
 void get_paras(int argc, char *argv[]) {
-    int opt = 0;
-    while((opt=getopt_long(argc, argv, short_options, long_options,NULL))!=-1) {
-        switch(opt)
-        {
-            case 0:break;
-            case 'h': {
-                printf("Usage: sudo ./ftpServer --port 21 --root /tmp\r\n");
-                exit(0);
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-port") == 0) {
+            if (i + 1 >= argc) {
+                printf("Error: Invaild parameters!\n");
+                exit(EXIT_FAILURE);
             }
-            case 'p': {
-                config.listen_port = atoi(optarg);
-                break;
+            config.listen_port = atoi(argv[i + 1]);
+        }
+        else if (strcmp(argv[i], "-root") == 0) {
+            if (i + 1 >= argc) {
+                printf("Error: Invaild parameters!\n");
+                exit(EXIT_FAILURE);
             }
-            case 'r': {
-                if(chdir(optarg) !=0 ) {
-                    printf("%s: %s\r\n", optarg, strerror(errno));
+            if (argv[i + 1][0] == '/') {
+                if(chdir(argv[i + 1]) != 0) {
+                    printf("%s: %s\r\n", argv[i + 1], strerror(errno));
                     exit(EXIT_FAILURE);
                 }
                 memset(config.root_path, 0, sizeof(config.root_path));
                 getcwd(config.root_path, PATH_LENGTH);
-                break;
+            }
+            else {
+                memset(config.root_path, 0, sizeof(config.root_path));
+                int join_status = join_path(code_path, argv[i + 1], config.root_path);
+                if (join_status == 0 || chdir(config.root_path) != 0) {
+                    printf("%s: %s\r\n", config.root_path, strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
             }
         }
     }
