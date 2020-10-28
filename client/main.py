@@ -1,9 +1,8 @@
-import re
 import sys
 from threading import Thread
 from functools import partial
 
-from PyQt5.QtCore import Qt, QDir, QSize, QThread
+from PyQt5.QtCore import Qt, QDir, QSize
 from PyQt5.QtGui import QIcon, QFont, QTextCursor
 from PyQt5.QtWidgets import (QWidget, QMainWindow, QAction, qApp, QLineEdit, QLabel, QTextEdit, QListWidgetItem,
                              QToolButton, QMenu, QSizePolicy, QPushButton, QApplication, QScrollBar,
@@ -140,23 +139,29 @@ class ServerArea(QWidget):
         self.fileListWidget = QListWidget()
         self.fileListWidget.setModelColumn(4)
 
-        buttonBox = QHBoxLayout()
+        buttonBox1 = QHBoxLayout()
         self.downloadButton = QPushButton('Download')
-        self.mkdirButton = QPushButton('New Folder')
         self.refreshButton = QPushButton('Refresh')
+        self.deleteButton = QPushButton('Delete file')
+        buttonBox1.addStretch(1)
+        buttonBox1.addWidget(self.downloadButton)
+        buttonBox1.addWidget(self.refreshButton)
+        buttonBox1.addWidget(self.deleteButton)
+
+        buttonBox2 = QHBoxLayout()
+        self.mkdirButton = QPushButton('New Folder')
         self.rmdirButton = QPushButton('Remove folder')
         self.renameButton = QPushButton('Rename')
-        buttonBox.addStretch(1)
-        buttonBox.addWidget(self.downloadButton)
-        buttonBox.addWidget(self.mkdirButton)
-        buttonBox.addWidget(self.refreshButton)
-        buttonBox.addWidget(self.rmdirButton)
-        buttonBox.addWidget(self.renameButton)
+        buttonBox2.addStretch(1)
+        buttonBox2.addWidget(self.mkdirButton)
+        buttonBox2.addWidget(self.rmdirButton)
+        buttonBox2.addWidget(self.renameButton)
 
         serverArea.addLayout(sitePath)
         serverArea.addLayout(siteFile)
         serverArea.addWidget(self.fileListWidget)
-        serverArea.addLayout(buttonBox)
+        serverArea.addLayout(buttonBox1)
+        serverArea.addLayout(buttonBox2)
 
         self.setLayout(serverArea)
 
@@ -216,6 +221,8 @@ class MainWindow(QMainWindow):
         self.isConnect = False
 
         self.initUI()
+
+        client.setWindow(self)
 
     def saveHistory(self):
         with open("history.ini", "w+") as fp:
@@ -286,9 +293,14 @@ class MainWindow(QMainWindow):
         systAction.triggered.connect(lambda: Thread(target=self.clientSyst).start())
         toolbar.addAction(systAction)
 
+        terminateAction = QAction(QIcon('res/terminate.png'), '&Terminate', self)
+        terminateAction.setStatusTip('System info')
+        terminateAction.triggered.connect(lambda: Thread(target=self.clientSyst).start())
+        toolbar.addAction(systAction)
+
         disconectAction = QAction(QIcon('res/disconnect.png'), '&Disconnect', self)
         disconectAction.setStatusTip('Disconnect')
-        disconectAction.triggered.connect(lambda: Thread(target=self._threadClientDisconnect).start())
+        disconectAction.triggered.connect(lambda: Thread(target=self.clientDisconnect).start())
         toolbar.addAction(disconectAction)
 
         exitAction = QAction(QIcon('res/exit.png'), '&Exit', self)
@@ -362,7 +374,8 @@ class MainWindow(QMainWindow):
     def connectServer(self):
         if self.isConnect:
             try:
-                client.quit()
+                msg = client.quit()
+                self.echo('Status', msg)
             except Exception as err:
                 self.echo('Error', err)
 
@@ -399,9 +412,6 @@ class MainWindow(QMainWindow):
             })
         self.echo('Status', 'Retrieving directory listing of "{}"...'.format(self.serverArea.serverPathLabel.text()))
         fileInfoList = client.listFiles()
-        # if not status:
-        #     self.logOut('Wrong', 'Retrieve directory listing failed')
-        #     return
         self.echo('Status', 'Directory listing of "{}" successful'.format(self.serverArea.serverPathLabel.text()))
         for fil in fileInfoList:
             try:
@@ -419,7 +429,7 @@ class MainWindow(QMainWindow):
                 print(fil)
         self.serverArea.setFileList(self.serverFileList)
 
-    def _threadClientDisconnect(self):
+    def clientDisconnect(self):
         self.serverArea.fileListWidget.blockSignals(True)
         self.serverArea.fileListWidget.clear()
         self.serverArea.fileListWidget.blockSignals(False)
@@ -428,12 +438,13 @@ class MainWindow(QMainWindow):
         try:
             if self.isConnect:
                 self.isConnect = False
-                client.quit()
+                msg = client.quit()
+                self.echo('Status', msg)
                 client.reset()
         finally:
             self.echo('Status', 'Disconnected from server')
 
-    def _preUpload(self):
+    def clientUpload(self):
         filename = self.localArea.localFileLable.text()
         if not self.isConnect:
             self.echo('Wrong', "No server connection")
@@ -441,24 +452,24 @@ class MainWindow(QMainWindow):
         if filename == '':
             self.echo('Wrong', "No local file selected")
             return
-        self.echo('Status', 'Begin to upload \'{}\''.format(filename))
         status = client.upload(filename)
         if status:
-            self.echo('Status', 'Upload "{}" successfully'.format(filename))
+            self.echo('Status', 'Begin to upload \'{}\''.format(filename))
 
     def initButtons(self):
         self.inputRow.connButton.clicked.connect(self.connectServer)
-        self.localArea.uploadButton.clicked.connect(lambda: self._preUpload())
-        self.serverArea.downloadButton.clicked.connect(lambda: Thread(target=self._preDownload).start())
+        self.localArea.uploadButton.clicked.connect(lambda: self.clientUpload())
+        self.serverArea.downloadButton.clicked.connect(lambda: Thread(target=self.clientDownload).start())
         self.serverArea.mkdirButton.clicked.connect(self.clientMkdir)
         self.serverArea.refreshButton.clicked.connect(self._refreshServerFileList)
         self.serverArea.rmdirButton.clicked.connect(self._preRemoveDir)
         self.serverArea.renameButton.clicked.connect(self._preRenameDir)
+        self.serverArea.deleteButton.clicked.connect(self.clientDelete)
 
         self.serverArea.fileListWidget.clicked.connect(self._selectServerFile)
         self.serverArea.fileListWidget.doubleClicked.connect(self.clientChangeDir)
 
-    def _preDownload(self):
+    def clientDownload(self):
         filename = self.serverArea.serverFileLable.text()
         if not self.isConnect:
             self.echo('Wrong', "No server connection")
@@ -466,10 +477,9 @@ class MainWindow(QMainWindow):
         if filename == '':
             self.echo('Wrong', "No server file selected")
             return
-        self.echo('Status', 'Begin to download \'{}\''.format(filename))
         status = client.download(filename)
         if status:
-            self.echo('Status', 'File "{}" transfer successful'.format(filename))
+            self.echo('Status', 'Begin to download \'{}\''.format(filename))
 
     def clientSyst(self):
         if not self.isConnect:
@@ -480,6 +490,21 @@ class MainWindow(QMainWindow):
             self.echo('Status', msg)
         else:
             self.echo('Error', 'Get system info failed')
+
+    def clientDelete(self):
+        if not self.isConnect:
+            self.echo('Wrong', "No server connection")
+            return
+        filename = self.serverArea.serverFileLable.text()
+        if filename == '':
+            self.echo('Wrong', "No local file selected")
+            return
+        status = client.deleteFile(filename)
+        if status:
+            self.echo('Status', 'Delete "{}" successfully'.format(filename))
+            self._refreshServerFileList()
+        else:
+            self.echo('Error', 'Delete "{}" failed'.format(filename))
 
     def clientMkdir(self):
         if not self.isConnect:
@@ -541,8 +566,11 @@ class MainWindow(QMainWindow):
             self.echo("Wrong", "No directory selected")
             return
         status = client.removeDir(name)
-        self.echo("Status", "Remove folder succeed")
-        self._refreshServerFileList()
+        if status:
+            self.echo("Status", "Remove folder successfully")
+            self._refreshServerFileList()
+        else:
+            self.echo("Status", "Remove folder failed")
 
     def _preRenameDir(self):
         if not self.isConnect:
