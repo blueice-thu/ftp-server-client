@@ -37,6 +37,10 @@ void command_pass(char* args, Session* state) {
 }
 
 void command_quit(char* args, Session* state) {
+    if (state->is_logged == 0) {
+        send_message(state, need_login_msg);
+        return;
+    }
     char quit_msg[] = "221-You have transferred %d bytes in %d files.\r\n"\
                 "221-Total traffic for this session was %d bytes in %d transfers.\r\n"\
                 "221-Thank you for using the FTP service on ftp.ssast.org.\r\n"\

@@ -9,7 +9,7 @@ const char no_permis_msg[] = "550 Permission denied.\r\n";
 const char *cmdlistStr[] = 
 {
     "USER", "PASS", "RETR", "STOR", "QUIT", "SYST", "TYPE", "PORT", "PASV",
-    "MKD", "CWD", "PWD", "LIST", "RMD", "RNFR", "RNTO", "ABOR", "DELE", "CDUP"
+    "MKD", "CWD", "PWD", "LIST", "RMD", "RNFR", "RNTO", "ABOR", "DELE", "CDUP", "REST"
 };
 
 void send_message(Session* state, const char* msg) {

@@ -80,6 +80,7 @@ void process_command(char* command, char* args, Session* state) {
         case ABOR:  command_abor(args, state);  break;
         case DELE:  command_dele(args, state);  break;
         case CDUP:  command_cdup(args, state);  break;
+        case REST:  command_rest(args, state);  break;
         default: {
             send_message(state, "500 Unknown command.\r\n");
             break;

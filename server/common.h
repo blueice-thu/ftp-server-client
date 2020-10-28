@@ -42,7 +42,7 @@ extern const char no_permis_msg[];
 #define TIMEOUT         20      // Seconds
 #define TIME_LENGTH     32
 
-#define SUPPORTED_CMD_COUNT 19
+#define SUPPORTED_CMD_COUNT 20
 
 typedef struct sockaddr_in SockAddrIn;
 typedef struct sockaddr SockAddr;
@@ -65,7 +65,7 @@ extern const char *cmdlistStr[];
 // Supported ftp commands
 typedef enum cmdlist { 
     USER, PASS, RETR, STOR, QUIT, SYST, TYPE, PORT, PASV,
-    MKD, CWD, PWD, LIST, RMD, RNFR, RNTO, ABOR, DELE, CDUP
+    MKD, CWD, PWD, LIST, RMD, RNFR, RNTO, ABOR, DELE, CDUP, REST
 } cmdlist;
 
 typedef enum SessionMode { 
@@ -85,9 +85,11 @@ typedef struct Session {
     int is_trans_data;      // State of transfering data
 
     char rename_from[PATH_LENGTH];
-    int rename_state;
+    int rename_state;       // Set 1 after REFR and block other commands except RNTO
 
     char work_dir[PATH_LENGTH];
+
+    int rest_pos;
     
     int trans_file_num;     // File number that sended and received
     int trans_file_bytes;   // File bytes that sended and received

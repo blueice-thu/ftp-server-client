@@ -9,6 +9,7 @@ void _command_retr(void* paras) {
     param_buffer* para = (param_buffer*)paras;
     FILE* fp = para->fp;
     Session* state = para->state;
+
     char buffer[BUFFER_LENGTH] = { 0 };
     while (!feof(fp)) {
         int read_bytes = fread(buffer, sizeof(char), BUFFER_LENGTH - 1, fp);
@@ -39,6 +40,8 @@ void command_retr(char* args, Session* state) {
     }
 
     FILE* fp = fopen(full_args_path, "rb");
+    fseek(fp, state->rest_pos, SEEK_SET);
+    state->rest_pos = 0;
     if (fp == NULL) {
         send_message(state, "551 Permission denied.\r\n");
         return ;
@@ -107,8 +110,16 @@ void command_stor(char* args, Session* state) {
     }
     char full_args_path[PATH_LENGTH] = { '\0' };
     int join_status = get_args_full_path(state, args, full_args_path);
+
+    FILE* fp = NULL;
+    if (state->rest_pos <= 0)
+        fp = fopen(full_args_path, "wb");
+    else {
+        fp = fopen(full_args_path, "wb+");
+        fseek(fp, state->rest_pos, SEEK_SET);
+        state->rest_pos = 0;
+    }
     
-    FILE* fp = fopen(full_args_path, "wb");
     if (join_status == 0 || fp == NULL) {
         send_message(state, "551 Permission denied.\r\n");
         return ;
@@ -130,4 +141,24 @@ void command_stor(char* args, Session* state) {
     paras->fp = fp;
     paras->state = state;
     pthread_create(&pid, NULL, (void*)_command_stor, (void*)paras);
+}
+
+void command_rest(char* args, Session* state) {
+    if (state->is_logged == 0) {
+        send_message(state, need_login_msg);
+        return;
+    }
+    int pos = atoi(args);
+    if (pos < 0) {
+        send_message(state, "501 Marker cannot be negetive.\r\n");
+    }
+    else if (pos == 0) {
+        send_message(state, "501 Not a valid number.\r\n");
+    }
+    else {
+        state->rest_pos = pos;
+        char msg[MSG_LENGTH];
+        sprintf(msg, "Restarting at %d. Send STORE or RETRIEVE to initiate transfer.\r\n", pos);
+        send_message(state, msg);
+    }
 }

@@ -7,4 +7,6 @@ void command_retr(char* args, Session* state);
 
 void command_stor(char* args, Session* state);
 
+void command_rest(char* args, Session* state);
+
 #endif
