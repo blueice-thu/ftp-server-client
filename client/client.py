@@ -1,29 +1,15 @@
-import socket, os, time, re
-from random import randint
+from utils import *
 from threading import Thread
+import time
 
 BUFFER_LENGTH = 1024
 
 
-def getLocalIP():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.connect(('8.8.8.8', 80))
-        ip = sock.getsockname()[0]
-    finally:
-        sock.close()
-    return ip
-
-
-def getRandomPort():
-    return randint(5001, 65535)
-
-
 class Client:
-    def __init__(self, info):
+    def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.settimeout(3)
-        self.info = info
+        # self.sock.settimeout(3)
+        self.info = {}
         self.mode = 'PASV'
 
         self.transMode = 'BINARY'
@@ -32,6 +18,15 @@ class Client:
         self.threadList = []
 
         self.serverPath = '/'
+
+    def reset(self):
+        self.__init__()
+
+    def setInfo(self, connInfo):
+        self.info['host'] = connInfo['host']
+        self.info['port'] = connInfo['port']
+        self.info['username'] = connInfo['username']
+        self.info['password'] = connInfo['password']
 
     def connect(self):
         print(self.info)
@@ -95,7 +90,7 @@ class Client:
         # return None
 
     def _uploadTask(self, filename, dataTransSock):
-        fullFileName = os.getcwd() + '\\' + filename
+        fullFileName = getLinuxCwd() + '/' + filename
         task = {
             'Server/Local file': fullFileName,
             'Direction': '-->>',
@@ -104,13 +99,13 @@ class Client:
         }
         self.taskList.append(task)
         print(dataTransSock)
-        dataTransSock.settimeout(3)
+        # dataTransSock.settimeout(3)
 
         # fileSize = os.path.getsize(fullFileName)
-        filename = filename.split('\\')[-1]
+        filename = filename.split('/')[-1]
         readFile = open(filename, 'rb')
         while True:
-            sendData = readFile.read(BUFFER_LENGTH * 10)
+            sendData = readFile.read(BUFFER_LENGTH)
             if not sendData:
                 break
             dataTransSock.send(sendData)
@@ -134,7 +129,7 @@ class Client:
 
     def _downloadTask(self, filename, dataTransSock):
         filename = filename.split('/')[-1]
-        fullFileName = os.getcwd() + '\\' + filename
+        fullFileName = getLinuxCwd() + '/' + filename
         task = {
             'Server/Local file': fullFileName,
             'Direction': '<<--',
@@ -143,7 +138,7 @@ class Client:
         }
         self.taskList.append(task)
         print(dataTransSock)
-        dataTransSock.settimeout(3)
+        # dataTransSock.settimeout(3)
         recvData = dataTransSock.recv(BUFFER_LENGTH)
         with open(fullFileName, 'wb') as recvFile:
             while len(recvData) > 0:
@@ -175,32 +170,34 @@ class Client:
         else:
             exit(1)
         self.sock.send("LIST\r\n".encode())
-        listData = dataTransSock.recv(BUFFER_LENGTH).decode()
+        listData = ""
+        while True:
+            newData = dataTransSock.recv(BUFFER_LENGTH).decode()
+            listData += newData
+            if not newData:
+                break
         # print(listData)
         # time.sleep(1)
         listMsg = self.sock.recv(BUFFER_LENGTH).decode()
-        print(listMsg)
+        # print(listMsg)
         dataTransSock.close()
         if len(listData) == 0:
             return False, listData
         fileInfoList = [i for i in listData.splitlines() if len(i) != 0]
-        return True, fileInfoList, listMsg
+        return fileInfoList
 
     def send_syst(self):
         self.sock.send("SYST\r\n".encode())
         systMsg = self.sock.recv(BUFFER_LENGTH).decode()
         print(systMsg)
         status, msg = systMsg.split(' ', 1)
-        if status == '215':
+        if status:
             return True, msg
         return False, msg
 
     def chooseType(self, typename):
         if typename == 'BINARY':
             self.sock.send("TYPE I\r\n".encode())
-        elif typename == 'ASCII':
-            # TODO
-            pass
         typeMsg = self.sock.recv(BUFFER_LENGTH).decode()
         status, msg = typeMsg.split(' ', 1)
         print(typeMsg)
@@ -285,7 +282,8 @@ if __name__ == '__main__':
         'password': 'ssast',
         'port': 21
     }
-    client = Client(info)
+    client = Client()
+    client.setInfo(info)
     client.connect()
     print('------------------------------------')
     client.login()

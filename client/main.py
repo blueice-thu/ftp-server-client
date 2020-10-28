@@ -1,9 +1,9 @@
-import os
 import re
 import sys
-import threading
+from threading import Thread
+from functools import partial
 
-from PyQt5.QtCore import Qt, QDir, QStringListModel, QSize
+from PyQt5.QtCore import Qt, QDir, QSize, QThread
 from PyQt5.QtGui import QIcon, QFont, QTextCursor
 from PyQt5.QtWidgets import (QWidget, QMainWindow, QAction, qApp, QLineEdit, QLabel, QTextEdit, QListWidgetItem,
                              QToolButton, QMenu, QSizePolicy, QPushButton, QApplication, QScrollBar,
@@ -11,30 +11,207 @@ from PyQt5.QtWidgets import (QWidget, QMainWindow, QAction, qApp, QLineEdit, QLa
                              QVBoxLayout, QTreeView)
 
 from client import Client
+from utils import *
+
+client = Client()
+
+
+def _getDevideLine():
+    devideLine = QPushButton()
+    devideLine.setMaximumWidth(1)
+    devideLine.setFocusPolicy(Qt.NoFocus)
+    return devideLine
+
+
+class InputRowWidget(QWidget):
+    def __init__(self, parent=None):
+        super(InputRowWidget, self).__init__(parent)
+        self.hBox = QHBoxLayout()
+
+        self.hostTextEdit = QLineEdit()
+        self.usernameTextEdit = QLineEdit()
+        self.passwordTextEdit = QLineEdit()
+        self.portTextEdit = QLineEdit()
+        self.connButton = QPushButton('Quickconnect')
+        self.moreButton = QToolButton()
+
+        self.hostTextEdit.setFixedWidth(120)
+        self.usernameTextEdit.setFixedWidth(120)
+        self.passwordTextEdit.setFixedWidth(120)
+        self.passwordTextEdit.setEchoMode(QLineEdit.Password)
+        self.portTextEdit.setMaxLength(5)
+        self.portTextEdit.setFixedWidth(80)
+
+        self.moreButton.setArrowType(Qt.DownArrow)
+        self.moreButton.setPopupMode(QToolButton.InstantPopup)
+
+        self.hBox.addWidget(QLabel('Host:', self))
+        self.hBox.addWidget(self.hostTextEdit)
+        self.hBox.addWidget(QLabel('Username:', self))
+        self.hBox.addWidget(self.usernameTextEdit)
+        self.hBox.addWidget(QLabel('Password:', self))
+        self.hBox.addWidget(self.passwordTextEdit)
+        self.hBox.addWidget(QLabel('Port:', self))
+        self.hBox.addWidget(self.portTextEdit)
+        self.hBox.addWidget(self.connButton)
+        self.hBox.addWidget(self.moreButton)
+        self.hBox.addStretch(1)
+
+        self.setLayout(self.hBox)
+        self.setContentsMargins(0, 0, 0, 0)
+
+
+class LocalArea(QWidget):
+    def __init__(self, parent=None):
+        super(LocalArea, self).__init__(parent)
+
+        self.localPathLabel = QLabel(getLinuxCwd())
+        self.localFileLable = QLabel('')
+        self.localModel = QFileSystemModel()
+        self.localModel.setRootPath(QDir.rootPath())
+
+        self.localPathLabel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.localFileLable.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        localArea = QVBoxLayout()
+        sitePath = QHBoxLayout()
+        sitePath.addWidget(QLabel('<b>Local site</b>:'))
+        sitePath.addWidget(self.localPathLabel, stretch=1)
+        sitePath.addStretch(1)
+        siteFile = QHBoxLayout()
+        siteFile.addWidget(QLabel('<b>Selected file</b>:'))
+        siteFile.addWidget(self.localFileLable, stretch=1)
+        siteFile.addStretch(1)
+
+        treeView = QTreeView()
+        treeView.setModel(self.localModel)
+        for pos, width in enumerate((280, 100, 100, 70)):
+            treeView.setColumnWidth(pos, width)
+        treeView.clicked.connect(self._localTreeViewClicked)
+
+        localPath = self.localPathLabel.text()
+        for i in range(len(localPath)):
+            if localPath[i] == '/':
+                treeView.expand(self.localModel.index(localPath[:i]))
+        treeView.expand(self.localModel.index(localPath))
+
+        buttonBox = QHBoxLayout()
+        self.uploadButton = QPushButton('Upload')
+        buttonBox.addStretch(1)
+        buttonBox.addWidget(self.uploadButton)
+
+        localArea.addLayout(sitePath)
+        localArea.addLayout(siteFile)
+        localArea.addWidget(treeView)
+        localArea.addLayout(buttonBox)
+        self.setLayout(localArea)
+
+    def _localTreeViewClicked(self, indexItem):
+        localPathOrFile = self.localModel.filePath(indexItem)
+        if self.localModel.isDir(indexItem):
+            self.localPathLabel.setText(localPathOrFile)
+        else:
+            self.localFileLable.setText(localPathOrFile)
+            localPathOrFile = re.findall(r'([\s\S]+)/[\s\S]+?', localPathOrFile)[0]
+            self.localPathLabel.setText(localPathOrFile)
+        os.chdir(localPathOrFile)
+
+
+class ServerArea(QWidget):
+    def __init__(self, parent=None):
+        super(ServerArea, self).__init__(parent)
+        self.serverPathLabel = QLabel('/')
+        self.serverFileLable = QLabel('')
+
+        self.serverPathLabel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.serverFileLable.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        serverArea = QVBoxLayout()
+
+        sitePath = QHBoxLayout()
+        sitePath.addWidget(QLabel('<b>Remote site</b>:'))
+        sitePath.addWidget(self.serverPathLabel, stretch=1)
+        sitePath.addStretch(1)
+        siteFile = QHBoxLayout()
+        siteFile.addWidget(QLabel('<b>Selected file</b>:'))
+        siteFile.addWidget(self.serverFileLable, stretch=1)
+        siteFile.addStretch(1)
+
+        self.fileListWidget = QListWidget()
+        self.fileListWidget.setModelColumn(4)
+
+        buttonBox = QHBoxLayout()
+        self.downloadButton = QPushButton('Download')
+        self.mkdirButton = QPushButton('New Folder')
+        self.refreshButton = QPushButton('Refresh')
+        self.rmdirButton = QPushButton('Remove folder')
+        self.renameButton = QPushButton('Rename')
+        buttonBox.addStretch(1)
+        buttonBox.addWidget(self.downloadButton)
+        buttonBox.addWidget(self.mkdirButton)
+        buttonBox.addWidget(self.refreshButton)
+        buttonBox.addWidget(self.rmdirButton)
+        buttonBox.addWidget(self.renameButton)
+
+        serverArea.addLayout(sitePath)
+        serverArea.addLayout(siteFile)
+        serverArea.addWidget(self.fileListWidget)
+        serverArea.addLayout(buttonBox)
+
+        self.setLayout(serverArea)
+
+    def setFileList(self, fileList):
+        self.fileListWidget.blockSignals(True)
+        self.fileListWidget.clear()
+        self.fileListWidget.blockSignals(False)
+        for file in fileList:
+            item, widget = self._getFileListItem(file['name'], file['isDir'], file['size'], file['time'])
+            self.fileListWidget.addItem(item)
+            self.fileListWidget.setItemWidget(item, widget)
+
+    @staticmethod
+    def _getFileListItem(name, isDir, size, modifyTime):
+        widget = QWidget()
+        layout = QHBoxLayout()
+
+        nameLabel = QLabel(name)
+        nameLabel.setObjectName('name')
+        layout.addWidget(nameLabel, stretch=1)
+        layout.addWidget(_getDevideLine())
+
+        isDirLabel = QLabel(isDir)
+        isDirLabel.setObjectName('isDir')
+        layout.addWidget(isDirLabel, stretch=1)
+        layout.addWidget(_getDevideLine())
+
+        sizeLabel = QLabel(size)
+        sizeLabel.setObjectName('size')
+        layout.addWidget(sizeLabel, stretch=1)
+        layout.addWidget(_getDevideLine())
+
+        modifyTimeLabel = QLabel(modifyTime)
+        modifyTimeLabel.setObjectName('modifyTime')
+        layout.addWidget(modifyTimeLabel, stretch=1)
+
+        widget.setLayout(layout)
+
+        item = QListWidgetItem()
+        item.setSizeHint(QSize(0, 43))
+
+        return item, widget
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.hostTextEdit = QLineEdit()
-        self.usernameTextEdit = QLineEdit()
-        self.passwordTextEdit = QLineEdit()
-        self.portTextEdit = QLineEdit()
+        self.inputRow = InputRowWidget(self)
+        self.localArea = LocalArea(self)
+        self.serverArea = ServerArea(self)
+
         self.logEditText = QTextEdit()
 
-        self.client = None
-
-        self.localPathLabel = QLabel(os.getcwd())
-        self.serverPathLabel = QLabel('/')
-        self.localFileLable = QLabel('')
-        self.serverFileLable = QLabel('')
-
-        self.localModel = QFileSystemModel()
-        self.localModel.setRootPath(QDir.rootPath())
-        self.serverModel = QStringListModel()
         self.serverFileList = []
-        self.serverFileListWidget = QListWidget()
 
         self.isConnect = False
 
@@ -43,17 +220,17 @@ class MainWindow(QMainWindow):
     def saveHistory(self):
         with open("history.ini", "w+") as fp:
             fp.write("{},{},{},{}\n".format(
-                self.hostTextEdit.text(),
-                self.usernameTextEdit.text(),
-                self.passwordTextEdit.text(),
-                self.portTextEdit.text(),
+                self.inputRow.hostTextEdit.text(),
+                self.inputRow.usernameTextEdit.text(),
+                self.inputRow.passwordTextEdit.text(),
+                self.inputRow.portTextEdit.text(),
             ))
 
     @staticmethod
     def readHistory():
         records = []
         with open("history.ini", "r") as fp:
-            record = fp.readline()
+            record = fp.readline().strip()
             while record:
                 record = record.split(',')
                 if len(record) != 4:
@@ -68,16 +245,22 @@ class MainWindow(QMainWindow):
             pass
 
     def loadHistory(self, connInfo):
-        self.hostTextEdit.setText(connInfo[0])
-        self.usernameTextEdit.setText(connInfo[1])
-        self.passwordTextEdit.setText(connInfo[2])
-        self.portTextEdit.setText(connInfo[3])
+        self.inputRow.hostTextEdit.setText(connInfo[0])
+        self.inputRow.usernameTextEdit.setText(connInfo[1])
+        self.inputRow.passwordTextEdit.setText(connInfo[2])
+        self.inputRow.portTextEdit.setText(connInfo[3])
 
     def clearInput(self):
-        self.hostTextEdit.clear()
-        self.usernameTextEdit.clear()
-        self.passwordTextEdit.clear()
-        self.portTextEdit.clear()
+        self.inputRow.hostTextEdit.clear()
+        self.inputRow.usernameTextEdit.clear()
+        self.inputRow.passwordTextEdit.clear()
+        self.inputRow.portTextEdit.clear()
+
+    @staticmethod
+    def _setClientMode(mode):
+        if mode != 'PORT' and mode != 'PASV':
+            return
+        client.mode = mode
 
     def initToolbar(self):
         toolbar = self.addToolBar('FTP client')
@@ -85,12 +268,27 @@ class MainWindow(QMainWindow):
 
         refreshAction = QAction(QIcon('res/refresh.png'), '&Refresh', self)
         refreshAction.setStatusTip('Refresh')
-        refreshAction.triggered.connect(self._initServerFileList)
+        refreshAction.triggered.connect(self._refreshServerFileList)
         toolbar.addAction(refreshAction)
+
+        portAction = QAction(QIcon('res/port.png'), '&Port', self)
+        portAction.setStatusTip('Active mode')
+        portAction.triggered.connect(partial(self._setClientMode, 'PORT'))
+        toolbar.addAction(portAction)
+
+        pasvAction = QAction(QIcon('res/pasv.png'), '&Pasv', self)
+        pasvAction.setStatusTip('Passive mode')
+        pasvAction.triggered.connect(partial(self._setClientMode, 'PASV'))
+        toolbar.addAction(pasvAction)
+
+        systAction = QAction(QIcon('res/system.png'), '&System', self)
+        systAction.setStatusTip('System info')
+        systAction.triggered.connect(lambda: Thread(target=self.clientSyst).start())
+        toolbar.addAction(systAction)
 
         disconectAction = QAction(QIcon('res/disconnect.png'), '&Disconnect', self)
         disconectAction.setStatusTip('Disconnect')
-        disconectAction.triggered.connect(self._disconnect)
+        disconectAction.triggered.connect(lambda: Thread(target=self._threadClientDisconnect).start())
         toolbar.addAction(disconectAction)
 
         exitAction = QAction(QIcon('res/exit.png'), '&Exit', self)
@@ -98,34 +296,13 @@ class MainWindow(QMainWindow):
         exitAction.triggered.connect(qApp.quit)
         toolbar.addAction(exitAction)
 
-    def moveCenter(self):
+    def _moveCenter(self):
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
-    def initConnectRow(self):
-        self.hostTextEdit.setFixedWidth(120)
-        self.usernameTextEdit.setFixedWidth(120)
-        self.passwordTextEdit.setFixedWidth(120)
-        self.portTextEdit.setMaxLength(5)
-        self.portTextEdit.setFixedWidth(80)
-
-        hbox = QHBoxLayout()
-        hbox.addWidget(QLabel('Host:', self))
-        hbox.addWidget(self.hostTextEdit)
-
-        hbox.addWidget(QLabel('Username:', self))
-        hbox.addWidget(self.usernameTextEdit)
-
-        hbox.addWidget(QLabel('Password:', self))
-        hbox.addWidget(self.passwordTextEdit)
-
-        hbox.addWidget(QLabel('Port:', self))
-        hbox.addWidget(self.portTextEdit)
-
-        connButton = QPushButton('Quickconnect', self)
-        connButton.clicked.connect(self.connectServer)
+    def initInputRow(self):
         menu = QMenu()
         clearInputAction = QAction('Clear input', menu)
         clearInputAction.triggered.connect(self.clearInput)
@@ -136,73 +313,75 @@ class MainWindow(QMainWindow):
         records = self.readHistory()
         for record in records:
             recordAction = QAction('{}@{}'.format(record[1], record[0]), menu)
-            recordAction.triggered.connect(lambda: self.loadHistory(record))
+            recordAction.triggered.connect(partial(self.loadHistory, record))
             recordActions.append(recordAction)
         menu.addSeparator()
         menu.addActions(recordActions)
 
-        moreButton = QToolButton()
-        moreButton.setArrowType(Qt.DownArrow)
-        moreButton.setMenu(menu)
-        moreButton.setPopupMode(QToolButton.InstantPopup)
-
-        hbox.addWidget(connButton)
-        hbox.addWidget(moreButton)
-        hbox.addStretch(1)
-        return hbox
+        self.inputRow.moreButton.setMenu(menu)
+        self.inputRow.setMaximumHeight(50)
 
     def initLogArea(self):
         self.logEditText.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.logEditText.setStyleSheet("font-size: 12; font-family: Segoe UI; padding: 5px")
-        self.logEditText.setMinimumHeight(80)
+        self.logEditText.setStyleSheet("font-size: 14; font-family: Segoe UI; padding: 10px")
+        self.logEditText.setMinimumHeight(120)
         self.logEditText.setText("Log output:")
         self.logEditText.setReadOnly(True)
-        self.logEditText.setMaximumHeight(120)
+        self.logEditText.setMaximumHeight(200)
         self.logEditText.ensureCursorVisible()
         scrollBar = QScrollBar()
         self.logEditText.setVerticalScrollBar(scrollBar)
         return self.logEditText
 
-    def logOut(self, title, content):
+    def echo(self, title, content):
         self.logEditText.append(str(title) + ': ' + str(content))
         cursor = self.logEditText.textCursor()
         cursor.movePosition(QTextCursor.End, QTextCursor.MoveAnchor)
         self.logEditText.setTextCursor(cursor)
 
-    def connectServer(self):
-        try:
-            self.client.quit()
-        except Exception as err:
-            print(err)
-        ipPattern = re.compile(r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?["
-                               r"0-9][0-9]?)$")
-        if not ipPattern.fullmatch(self.hostTextEdit.text()):
-            self.logOut('Wrong', 'Invaild host!')
-            return
-        if not self.portTextEdit.text().isdigit():
-            self.logOut('Wrong', 'Invaild port!')
-            return
-        self.client = Client({
-            'host': self.hostTextEdit.text(),
-            'username': self.usernameTextEdit.text(),
-            'password': self.passwordTextEdit.text(),
-            'port': int(self.portTextEdit.text())
-        })
-        status, msg = self.client.connect()
+    def threadClientConnect(self):
+        status, msg = client.connect()
         if not status:
-            self.logOut('Status', msg)
+            self.echo('Status', msg)
             return
-        self.logOut('Status', 'Connection established, waiting for welcome message...')
-        self.logOut('Status', msg)
-        status, msg = self.client.login()
+        self.echo('Status', 'Connection established, waiting for welcome message...')
+        self.echo('Status', msg)
+        self.threadClientLogin()
+
+    def threadClientLogin(self):
+        status, msg = client.login()
         if not status:
-            self.logOut('Wrong', 'Login failed!')
+            self.echo('Wrong', 'Login failed!')
             return
         self.isConnect = True
-        self.logOut('Status', 'Logged in')
-        self._initServerFileList()
+        self.echo('Status', 'Logged in')
+        status, msg = client.send_syst()
+        self.echo('Status', msg)
+        self._refreshServerFileList()
 
-    def _refreshFileInfoList(self):
+    def connectServer(self):
+        if self.isConnect:
+            try:
+                client.quit()
+            except Exception as err:
+                self.echo('Error', err)
+
+        if not ipPattern.fullmatch(self.inputRow.hostTextEdit.text()):
+            self.echo('Wrong', 'Invaild host!')
+            return
+        if not self.inputRow.portTextEdit.text().isdigit():
+            self.echo('Wrong', 'Invaild port!')
+            return
+        client.setInfo({
+            'host': self.inputRow.hostTextEdit.text(),
+            'username': self.inputRow.usernameTextEdit.text(),
+            'password': self.inputRow.passwordTextEdit.text(),
+            'port': int(self.inputRow.portTextEdit.text())
+        })
+        # Thread(target=self.threadClientConnect).start()
+        self.threadClientConnect()
+
+    def _refreshServerFileList(self):
         if not self.isConnect:
             return
         self.serverFileList = [{
@@ -211,19 +390,19 @@ class MainWindow(QMainWindow):
             'size': 'Size',
             'time': 'Modify time'
         }]
-        if self.serverPathLabel.text() != '/':
+        if self.serverArea.serverPathLabel.text() != '/':
             self.serverFileList.append({
                 'name': '..',
                 'isDir': 'Directory',
                 'size': '',
                 'time': ''
             })
-        self.logOut('Status', 'Retrieving directory listing of "{}"...'.format(self.serverPathLabel.text()))
-        status, fileInfoList, _ = self.client.listFiles()
-        if not status:
-            self.logOut('Wrong', 'Retrieve directory listing failed')
-            return
-        self.logOut('Status', 'Directory listing of "/" successful')
+        self.echo('Status', 'Retrieving directory listing of "{}"...'.format(self.serverArea.serverPathLabel.text()))
+        fileInfoList = client.listFiles()
+        # if not status:
+        #     self.logOut('Wrong', 'Retrieve directory listing failed')
+        #     return
+        self.echo('Status', 'Directory listing of "{}" successful'.format(self.serverArea.serverPathLabel.text()))
         for fil in fileInfoList:
             try:
                 findResult = \
@@ -232,299 +411,182 @@ class MainWindow(QMainWindow):
                     'isDir': 'Directory' if fil.startswith('d') else 'File',
                     'name': findResult[2],
                     'time': findResult[1],
-                    'size': findResult[0]
+                    'size': convert(findResult[0])
                 }
                 self.serverFileList.append(newFile)
             except Exception as err:
                 print(err)
                 print(fil)
-        # for i in self.serverFileList:
-        #     print(i)
+        self.serverArea.setFileList(self.serverFileList)
 
-    def _disconnect(self):
+    def _threadClientDisconnect(self):
+        self.serverArea.fileListWidget.blockSignals(True)
+        self.serverArea.fileListWidget.clear()
+        self.serverArea.fileListWidget.blockSignals(False)
+        self.serverArea.serverPathLabel.setText('/')
+        self.serverArea.serverFileLable.setText('')
         try:
-            self.serverFileListWidget.blockSignals(True)
-            self.serverFileListWidget.clear()
-            self.serverFileListWidget.blockSignals(False)
-            item, widget = self._getFileListItem('Name', 'Type', 'Size', 'Modify time')
-            self.serverFileListWidget.addItem(item)
-            self.serverFileListWidget.setItemWidget(item, widget)
-            self.isConnect = False
-            self.client.quit()
+            if self.isConnect:
+                self.isConnect = False
+                client.quit()
+                client.reset()
         finally:
-            self.logOut('Status', 'Disconnected from server')
-
-    def _localTreeViewClicked(self, indexItem):
-        localPathOrFile = self.localModel.filePath(indexItem).replace('/', '\\')
-        if self.localModel.isDir(indexItem):
-            self.localPathLabel.setText(localPathOrFile)
-        else:
-            self.localFileLable.setText(localPathOrFile)
-            localPathOrFile = re.findall(r'([\s\S]+)\\[\s\S]+?', localPathOrFile)[0]
-            self.localPathLabel.setText(localPathOrFile)
-        os.chdir(localPathOrFile)
-
-    def initLocalArea(self):
-        localWidget = QWidget()
-        localArea = QVBoxLayout()
-        siteBar = QHBoxLayout()
-        self.localPathLabel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.localFileLable.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        siteBar.addWidget(QLabel('<b>Local site</b>:'))
-        siteBar.addWidget(self.localPathLabel, stretch=1)
-        siteBar.addStretch(1)
-        siteBar.addWidget(QLabel('<b>Selected file</b>:'))
-        siteBar.addWidget(self.localFileLable, stretch=1)
-        siteBar.addStretch(1)
-        localArea.addLayout(siteBar)
-
-        treeView = QTreeView()
-        treeView.setModel(self.localModel)
-        treeView.clicked.connect(self._localTreeViewClicked)
-        localPath = self.localPathLabel.text()
-        for i in range(len(localPath)):
-            if localPath[i] == '\\':
-                treeView.expand(self.localModel.index(localPath[:i]))
-        treeView.expand(self.localModel.index(localPath))
-
-        localArea.addWidget(treeView)
-        localWidget.setLayout(localArea)
-        return localWidget
-
-    @staticmethod
-    def _getDevideLine():
-        devideLine = QPushButton()
-        devideLine.setMaximumWidth(1)
-        devideLine.setFocusPolicy(Qt.NoFocus)
-        return devideLine
-
-    def _getFileListItem(self, name, isDir, size, modifyTime):
-        widget = QWidget()
-        layout = QHBoxLayout()
-
-        nameLabel = QLabel(name)
-        nameLabel.setObjectName('name')
-        layout.addWidget(nameLabel, stretch=1)
-        layout.addWidget(self._getDevideLine())
-
-        isDirLabel = QLabel(isDir)
-        isDirLabel.setObjectName('isDir')
-        layout.addWidget(isDirLabel, stretch=1)
-        layout.addWidget(self._getDevideLine())
-
-        sizeLabel = QLabel(size)
-        sizeLabel.setObjectName('size')
-        layout.addWidget(sizeLabel, stretch=1)
-        layout.addWidget(self._getDevideLine())
-
-        modifyTimeLabel = QLabel(modifyTime)
-        modifyTimeLabel.setObjectName('modifyTime')
-        layout.addWidget(modifyTimeLabel, stretch=1)
-
-        widget.setLayout(layout)
-
-        item = QListWidgetItem()
-        item.setSizeHint(QSize(0, 43))
-
-        return item, widget
-
-    def _initServerFileList(self):
-        self._refreshFileInfoList()
-        self.serverFileListWidget.blockSignals(True)
-        self.serverFileListWidget.clear()
-        self.serverFileListWidget.blockSignals(False)
-        for file in self.serverFileList:
-            item, widget = self._getFileListItem(file['name'], file['isDir'], file['size'], file['time'])
-            self.serverFileListWidget.addItem(item)
-            self.serverFileListWidget.setItemWidget(item, widget)
-
-    def initServerArea(self):
-        remoteWidget = QWidget()
-        remoteArea = QVBoxLayout()
-        siteBar = QHBoxLayout()
-        self.serverPathLabel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.serverFileLable.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        siteBar.addWidget(QLabel('<b>Remote site</b>:'))
-        siteBar.addWidget(self.serverPathLabel, stretch=1)
-        siteBar.addStretch(1)
-        siteBar.addWidget(QLabel('<b>Selected file</b>:'))
-        siteBar.addWidget(self.serverFileLable, stretch=1)
-        siteBar.addStretch(1)
-        remoteArea.addLayout(siteBar)
-
-        self.serverFileListWidget.clicked.connect(self._selectServerFile)
-        self.serverFileListWidget.doubleClicked.connect(self._preChangeDir)
-
-        remoteArea.addWidget(self.serverFileListWidget)
-        self._initServerFileList()
-
-        remoteWidget.setLayout(remoteArea)
-        return remoteWidget
+            self.echo('Status', 'Disconnected from server')
 
     def _preUpload(self):
-        filename = self.localFileLable.text()
+        filename = self.localArea.localFileLable.text()
         if not self.isConnect:
-            self.logOut('Wrong', "No server connection")
+            self.echo('Wrong', "No server connection")
             return
         if filename == '':
-            self.logOut('Wrong', "No local file selected")
+            self.echo('Wrong', "No local file selected")
             return
-        self.logOut('Status', 'Begin to upload \'{}\''.format(filename))
-        status = self.client.upload(filename)
+        self.echo('Status', 'Begin to upload \'{}\''.format(filename))
+        status = client.upload(filename)
         if status:
-            self.logOut('Status', 'Upload "{}" successfully'.format(filename))
+            self.echo('Status', 'Upload "{}" successfully'.format(filename))
 
-    def initLocalButtonArea(self):
-        uploadButton = QPushButton('Upload', self)
-        uploadButton.clicked.connect(lambda: threading.Thread(target=self._preUpload).start())
+    def initButtons(self):
+        self.inputRow.connButton.clicked.connect(self.connectServer)
+        self.localArea.uploadButton.clicked.connect(lambda: self._preUpload())
+        self.serverArea.downloadButton.clicked.connect(lambda: Thread(target=self._preDownload).start())
+        self.serverArea.mkdirButton.clicked.connect(self.clientMkdir)
+        self.serverArea.refreshButton.clicked.connect(self._refreshServerFileList)
+        self.serverArea.rmdirButton.clicked.connect(self._preRemoveDir)
+        self.serverArea.renameButton.clicked.connect(self._preRenameDir)
 
-        localWidget = QWidget()
-        hBox = QHBoxLayout()
-        hBox.addStretch(1)
-        hBox.addWidget(uploadButton)
-        localWidget.setLayout(hBox)
-
-        return localWidget
+        self.serverArea.fileListWidget.clicked.connect(self._selectServerFile)
+        self.serverArea.fileListWidget.doubleClicked.connect(self.clientChangeDir)
 
     def _preDownload(self):
-        filename = self.serverFileLable.text()
+        filename = self.serverArea.serverFileLable.text()
         if not self.isConnect:
-            self.logOut('Wrong', "No server connection")
+            self.echo('Wrong', "No server connection")
             return
         if filename == '':
-            self.logOut('Wrong', "No server file selected")
+            self.echo('Wrong', "No server file selected")
             return
-        self.logOut('Status', 'Begin to download \'{}\''.format(filename))
-        status = self.client.download(filename)
+        self.echo('Status', 'Begin to download \'{}\''.format(filename))
+        status = client.download(filename)
         if status:
-            self.logOut('Status', 'File "{}" transfer successful'.format(filename))
+            self.echo('Status', 'File "{}" transfer successful'.format(filename))
 
-    def _preMkdir(self):
+    def clientSyst(self):
         if not self.isConnect:
-            self.logOut('Wrong', "No server connection")
+            self.echo('Wrong', "No server connection")
+            return
+        status, msg = client.send_syst()
+        if status:
+            self.echo('Status', msg)
+        else:
+            self.echo('Error', 'Get system info failed')
+
+    def clientMkdir(self):
+        if not self.isConnect:
+            self.echo('Wrong', "No server connection")
             return
         value, ok = QInputDialog.getText(self, "New Folder", "Input the name of the new folder:", QLineEdit.Normal)
         if not value or not ok:
             return
-        status = self.client.makeDir(value)
+        status = client.makeDir(value)
         if status:
-            self.logOut('Status', 'New Directory \'{}\' created'.format(value))
+            self.echo('Status', 'New Directory \'{}\' created'.format(value))
+            self._refreshServerFileList()
         else:
-            self.logOut('Wrong', 'Fail to create folder \'{}\''.format(value))
+            self.echo('Wrong', 'Fail to create folder \'{}\''.format(value))
 
-    def _preChangeDir(self):
+    def clientChangeDir(self):
         if not self.isConnect:
-            self.logOut('Wrong', "No server connection")
+            self.echo('Wrong', "No server connection")
             return
-        currentItem = self.serverFileListWidget.currentItem()
-        currentWidget = self.serverFileListWidget.itemWidget(currentItem)
+        currentItem = self.serverArea.fileListWidget.currentItem()
+        currentWidget = self.serverArea.fileListWidget.itemWidget(currentItem)
         name = currentWidget.findChild(QLabel, 'name').text()
         isDir = currentWidget.findChild(QLabel, 'isDir').text()
         if isDir != 'Directory':
             return
-        status = self.client.changeWrokDir(name)
+        status = client.changeWrokDir(name)
         if status:
-            serverPath = self.client.printWorkDir()
-            self.serverPathLabel.setText(serverPath)
-            self._initServerFileList()
+            self.echo('Status', 'Change work directory succeed')
+            serverPath = client.printWorkDir()
+            self.serverArea.serverPathLabel.setText(serverPath)
+            self._refreshServerFileList()
+        else:
+            self.echo('Status', 'Change work directory failed')
 
     def _selectServerFile(self):
         if not self.isConnect:
-            self.logOut('Wrong', "No server connection")
+            self.echo('Wrong', "No server connection")
             return
-        currentItem = self.serverFileListWidget.currentItem()
-        currentWidget = self.serverFileListWidget.itemWidget(currentItem)
+        currentItem = self.serverArea.fileListWidget.currentItem()
+        currentWidget = self.serverArea.fileListWidget.itemWidget(currentItem)
         name = currentWidget.findChild(QLabel, 'name').text()
         isDir = currentWidget.findChild(QLabel, 'isDir').text()
         if isDir != 'File':
             return
-        serverPath = self.serverPathLabel.text()
+        serverPath = self.serverArea.serverPathLabel.text()
         if serverPath == '/':
             serverPath = ''
-        self.serverFileLable.setText(serverPath + '/' + name)
+        self.serverArea.serverFileLable.setText(serverPath + '/' + name)
 
     def _preRemoveDir(self):
         if not self.isConnect:
-            self.logOut('Wrong', "No server connection")
+            self.echo('Wrong', "No server connection")
             return
-        currentItem = self.serverFileListWidget.currentItem()
-        currentWidget = self.serverFileListWidget.itemWidget(currentItem)
+        currentItem = self.serverArea.fileListWidget.currentItem()
+        currentWidget = self.serverArea.fileListWidget.itemWidget(currentItem)
         name = currentWidget.findChild(QLabel, 'name').text()
         isDir = currentWidget.findChild(QLabel, 'isDir').text()
         if isDir != 'Directory':
-            self.logOut("Wrong", "No directory selected")
+            self.echo("Wrong", "No directory selected")
             return
-        status = self.client.removeDir(name)
-        print('status: ', status)
+        status = client.removeDir(name)
+        self.echo("Status", "Remove folder succeed")
+        self._refreshServerFileList()
 
     def _preRenameDir(self):
         if not self.isConnect:
-            self.logOut('Wrong', "No server connection")
+            self.echo('Wrong', "No server connection")
             return
-        currentItem = self.serverFileListWidget.currentItem()
-        currentWidget = self.serverFileListWidget.itemWidget(currentItem)
+        currentItem = self.serverArea.fileListWidget.currentItem()
+        currentWidget = self.serverArea.fileListWidget.itemWidget(currentItem)
         name = currentWidget.findChild(QLabel, 'name').text()
         isDir = currentWidget.findChild(QLabel, 'isDir').text()
         if isDir != 'Directory':
-            self.logOut("Wrong", "No directory selected")
+            self.echo("Wrong", "No directory selected")
             return
         value, ok = QInputDialog.getText(self, "Rename", "Input new name for folder {}:".format(name), QLineEdit.Normal)
         if not value or not ok:
             return
-        status = self.client.rename(name, value)
-        self.logOut('Status', 'Renaming "{}" to "{}"'.format(name, value))
-        print(status)
-        # if status:
-        #     self.logOut('Status', 'New Directory \'{}\' created'.format(value))
-        # else:
-        #     self.logOut('Wrong', 'Fail to create folder \'{}\''.format(value))
-
-    def initServerButtonArea(self):
-        downloadButton = QPushButton('Download', self)
-        downloadButton.clicked.connect(lambda: threading.Thread(target=self._preDownload).start())
-        mkdirButton = QPushButton('New Folder', self)
-        mkdirButton.clicked.connect(self._preMkdir)
-        refreshButton = QPushButton('Refresh', self)
-        refreshButton.clicked.connect(self._initServerFileList)
-        rmdirButton = QPushButton('Remove folder', self)
-        rmdirButton.clicked.connect(self._preRemoveDir)
-        renameButton = QPushButton('Rename', self)
-        renameButton.clicked.connect(self._preRenameDir)
-
-        serverWidget = QWidget()
-        hBox = QHBoxLayout()
-        hBox.addStretch(1)
-        hBox.addWidget(downloadButton)
-        hBox.addWidget(mkdirButton)
-        hBox.addWidget(refreshButton)
-        hBox.addWidget(rmdirButton)
-        hBox.addWidget(renameButton)
-        serverWidget.setLayout(hBox)
-        return serverWidget
+        self.echo('Status', 'Renaming "{}" to "{}"'.format(name, value))
+        status = client.rename(name, value)
+        if status:
+            self.echo('Status', 'Rename succeed')
+            self._refreshServerFileList()
 
     def initUI(self):
         self.statusBar()
         self.initToolbar()
+        self.initInputRow()
+        self.initButtons()
 
         mainVBox = QVBoxLayout()
-        mainVBox.addLayout(self.initConnectRow())
+        mainVBox.addWidget(self.inputRow)
         mainVBox.addWidget(self.initLogArea())
 
-        vSpliter = QSplitter(Qt.Vertical)
-        vSpliter.addWidget(self.initLocalArea())
-        vSpliter.addWidget(self.initLocalButtonArea())
-        vSpliter.addWidget(self.initServerArea())
-        vSpliter.addWidget(self.initServerButtonArea())
+        hSpliter = QSplitter(Qt.Horizontal)
+        hSpliter.addWidget(self.localArea)
+        hSpliter.addWidget(_getDevideLine())
+        hSpliter.addWidget(self.serverArea)
 
-        mainVBox.addWidget(vSpliter)
-        mainVBox.addStretch(1)
+        mainVBox.addWidget(hSpliter)
 
         widget = QWidget()
         self.setCentralWidget(widget)
         widget.setLayout(mainVBox)
 
         self.resize(1200, 800)
-        self.moveCenter()
+        self._moveCenter()
         self.setWindowTitle('FTP-Client')
         self.setFont(QFont('Segoe UI', 10))
         self.setWindowIcon(QIcon('./res/icon.png'))
