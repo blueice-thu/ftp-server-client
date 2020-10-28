@@ -3,7 +3,6 @@
 
 int main(int argc, char *argv[]) {
     check_root_permission();
-    getcwd(code_path, PATH_LENGTH);
 
     read_config();
     get_paras(argc, argv);
@@ -13,13 +12,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    int ip[4] = { 0 };
-    get_local_ip(ip);
-
-    printf("FTP server start!\r\n");
-    printf("Listen Port: %u\r\n", config.listen_port);
-    printf("Local IP Address: %d.%d.%d.%d\r\n", ip[0], ip[1], ip[2], ip[3]);
-    printf("Root Path: %s\r\n", config.root_path);
+    log_record_start();
 
     receive_request(listen_fd);
     

@@ -27,7 +27,7 @@ void* process_request(void* client_descriptor) {
     
     int read_bytes = read(sockfd, buffer, BUFFER_LENGTH);
     while (read_bytes > 0 && read_bytes <= BUFFER_LENGTH) {
-        printf("Command: %s\r\n", buffer);
+        log_record_string(buffer);
         sscanf(buffer,"%s %s", command, args);
         process_command(command, args, state);
         memset(buffer, '\0', sizeof(char) * BUFFER_LENGTH);
@@ -39,7 +39,7 @@ void* process_request(void* client_descriptor) {
     close(sockfd);
     if (state->pasv_addr) free(state->pasv_addr);
     free(state);
-    printf("Client disconnected!\r\n");
+    log_record_string("Client disconnected");
 
     return NULL;
 }
@@ -54,6 +54,10 @@ void process_command(char* command, char* args, Session* state) {
     }
     if (state->is_trans_data == 1 && command_index != ABOR && command_index != QUIT) {
         send_message(state, "421 Data transfering and refuse control command.\r\n");
+        return;
+    }
+    if (state->rename_state == 1 && command_index != RNTO && command_index != ABOR && command_index != QUIT) {
+        send_message(state, "421 Rename command has not been done.\r\n");
         return;
     }
     switch (command_index) {

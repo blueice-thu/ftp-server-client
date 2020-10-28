@@ -26,6 +26,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <errno.h>
+#include<time.h>
 
 extern const char need_login_msg[];
 extern const char no_file_msg[];
@@ -39,6 +40,7 @@ extern const char no_permis_msg[];
 #define PATH_LENGTH     512     // Maximum length of server path
 #define MSG_LENGTH      512     // Maximum length of a message
 #define TIMEOUT         20      // Seconds
+#define TIME_LENGTH     32
 
 #define SUPPORTED_CMD_COUNT 19
 
@@ -49,6 +51,8 @@ typedef struct Config {
     unsigned int listen_port;
     char* listen_address;
     char root_path[PATH_LENGTH];
+    char code_path[PATH_LENGTH];
+    char log_path[PATH_LENGTH];
     int num_user;
     int custom_num_user;
     char** username_table;
@@ -57,7 +61,6 @@ typedef struct Config {
 
 extern Config config;
 extern const char *cmdlistStr[];
-extern char code_path[PATH_LENGTH];
 
 // Supported ftp commands
 typedef enum cmdlist { 
@@ -81,7 +84,7 @@ typedef struct Session {
     int data_trans_fd;      // Sockfd for transfering file
     int is_trans_data;      // State of transfering data
 
-    char* rename_from;
+    char rename_from[PATH_LENGTH];
     int rename_state;
 
     char work_dir[PATH_LENGTH];
@@ -123,7 +126,8 @@ void update_data_trans_fd(Session* state);
 void close_trans_conn(Session* state);
 
 /**
-* Search username from username_table given by config.conf
+* Search username from username_table given by config.conf. 
+* Return -1 if failing.
 */
 int search_username(const char* username);
 
@@ -152,5 +156,14 @@ int is_valid_path(char* path);
 
 // Generate full path by joining root_path, work_dir and args
 int get_args_full_path(Session* state, char* args, char* result);
+
+// Store "yyyy.mm.dd hh:mm:ss" in time_str
+void get_current_time(char time_str[]);
+
+// Store start information in log file
+void log_record_start();
+
+// Store a string in log file and add time prefix automatically
+void log_record_string(char content[]);
 
 #endif

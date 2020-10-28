@@ -11,6 +11,7 @@ void read_config() {
     memset(&config, 0, sizeof(config));
     const char filename[] = "config.conf";
     char line[MAX_LINE_LENGTH_CONFIG] = {0};
+    getcwd(config.code_path, PATH_LENGTH);
     FILE* pf = NULL;
     pf = fopen(filename, "r");
     if (pf == NULL) {
@@ -69,16 +70,19 @@ void read_config() {
             config.username_table = (char**)calloc(config.num_user, sizeof(char*));
             config.password_table = (char**)calloc(config.num_user, sizeof(char*));
         }
+        else if (strcmp(key, "log_file") == 0) {
+            int join_status = join_path(config.code_path, value, config.log_path);
+            if (join_status == 0) {
+                printf("Error: Wrong log path!\n");
+                exit(EXIT_FAILURE);
+            }
+        }
         else if (strncmp(key, "user_", 5) == 0) {
             config.username_table[config.custom_num_user] = strdup(key + 5);
             config.password_table[config.custom_num_user] = strdup(value);
             config.custom_num_user += 1;
         }
-        else {
-            printf("Wrong: has no attribute %s!\r\n", key);
-        }
     }
-
 }
 
 void get_paras(int argc, char *argv[]) {
@@ -105,7 +109,7 @@ void get_paras(int argc, char *argv[]) {
             }
             else {
                 memset(config.root_path, 0, sizeof(config.root_path));
-                int join_status = join_path(code_path, argv[i + 1], config.root_path);
+                int join_status = join_path(config.code_path, argv[i + 1], config.root_path);
                 if (join_status == 0 || chdir(config.root_path) != 0) {
                     printf("%s: %s\r\n", config.root_path, strerror(errno));
                     exit(EXIT_FAILURE);

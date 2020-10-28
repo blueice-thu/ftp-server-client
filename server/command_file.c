@@ -110,7 +110,7 @@ void command_list(char* args, Session* state) {
 
         struct stat data_info;
         if(lstat(filename, &data_info) == -1) {
-            printf("Wrong: list.\r\n");
+            log_record_string("Error: LIST");
             exit(EXIT_FAILURE);
         }
         char buffer[BUFFER_LENGTH] = "%s";
@@ -153,7 +153,7 @@ void command_rmd(char* args, Session* state) {
     if (join_status == 0 || access(full_args_path, F_OK) == -1 || !S_ISDIR(st.st_mode)) {
         send_message(state, "550 Not a valid directory.\r\n");
     }
-    else if (nftw(args, rmFiles, 10, FTW_DEPTH | FTW_MOUNT | FTW_PHYS) < 0) {
+    else if (nftw(full_args_path, rmFiles, 10, FTW_DEPTH | FTW_MOUNT | FTW_PHYS) < 0) {
         perror("ERROR: ntfw");
         exit(1);
     }
@@ -171,18 +171,13 @@ void command_rnfr(char* args, Session* state) {
     char full_args_path[PATH_LENGTH] = { '\0' };
     int join_status = get_args_full_path(state, args, full_args_path);
 
-    if (join_status || access(full_args_path, R_OK) == -1) {
+    if (join_status == 0 || access(full_args_path, R_OK) == -1) {
         send_message(state, no_file_msg);
-    }
-    else if (access(args, W_OK) == -1) {
-        send_message(state, no_permis_msg);
     }
     else {
         state->rename_state = 1;
-        if (state->rename_from) free(state->rename_from);
-        state->rename_from = (char*)malloc(PATH_LENGTH);
-        send_message(state, "350 Ready to rename file.\r\n");
         strcpy(state->rename_from, full_args_path);
+        send_message(state, "350 Ready to rename file.\r\n");
     }
 }
 
@@ -191,7 +186,7 @@ void command_rnto(char* args, Session* state) {
         send_message(state, need_login_msg);
         return;
     }
-    if (state->rename_from == NULL || state->rename_state == 0) {
+    if (strlen(state->rename_from) == 0 || state->rename_state == 0) {
         send_message(state, "550 No file is specified.\r\n");
         return;
     }
@@ -206,9 +201,7 @@ void command_rnto(char* args, Session* state) {
         send_message(state, "250 Rename file successfully.\r\n");
     }
 
-    free(state->rename_from);
     state->rename_state = 0;
-    state->rename_from = NULL;
 }
 
 void command_dele(char* args, Session* state) {

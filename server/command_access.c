@@ -15,9 +15,6 @@ void command_user(char* args, Session* state) {
 }
 
 void command_pass(char* args, Session* state) {
-    send_message(state, "230 User logged in, proceed.\r\n");
-        state->is_logged = 1;
-        return;
     if (state->is_logged == 1) {
         send_message(state, "202 Already logged in.\r\n");
         return;
@@ -26,7 +23,11 @@ void command_pass(char* args, Session* state) {
         send_message(state, "503 Login with USER first.\r\n");
         return;
     }
-    if (check_password(state->user_index, args)) {
+    else if (state->user_index == 0) {
+        send_message(state, "230 User logged in, proceed.\r\n");
+        state->is_logged = 1;
+    }
+    else if (check_password(state->user_index, args)) {
         send_message(state, "230 User logged in, proceed.\r\n");
         state->is_logged = 1;
     }

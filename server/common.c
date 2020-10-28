@@ -12,8 +12,6 @@ const char *cmdlistStr[] =
     "MKD", "CWD", "PWD", "LIST", "RMD", "RNFR", "RNTO", "ABOR", "DELE", "CDUP"
 };
 
-char code_path[PATH_LENGTH] = { '\0' };
-
 void send_message(Session* state, const char* msg) {
     int bytes = strlen(msg);
     state->trans_all_bytes += bytes;
@@ -200,4 +198,38 @@ int get_args_full_path(Session* state, char* args, char* result) {
     join_status = join_path(real_work_dir, args, result);
     if (join_status == 0) return 0;
     return 1;
+}
+
+void get_current_time(char time_str[]) {
+    time_t timer;
+    struct tm *tblock;
+    time(&timer);
+    tblock = gmtime(&timer);
+    memset(time_str, 0, strlen(time_str));
+    sprintf(time_str, "%d.%d.%d %d:%d:%d", tblock->tm_year+1900, tblock->tm_mon+1, tblock->tm_mday, tblock->tm_hour+8, tblock->tm_min, tblock->tm_sec);
+}
+
+void log_record_start() {
+    int ip[4] = { 0 };
+    get_local_ip(ip);
+    log_record_string("=====================FTP Server start!====================");
+    char buffer[1024];
+    sprintf(buffer, "Listen Port: %u", config.listen_port);
+    log_record_string(buffer);
+    sprintf(buffer, "Local IP Address: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    log_record_string(buffer);
+    sprintf(buffer, "Root Path: %s", config.root_path);
+    log_record_string(buffer);
+}
+
+void log_record_string(char content[]) {
+    FILE* fp = fopen(config.log_path, "a");
+    if (fp == NULL) {
+        printf("Error: cannot open log file!\n");
+        exit(EXIT_FAILURE);
+    }
+    char time_buffer[TIME_LENGTH] = { '\0' };
+    get_current_time(time_buffer);
+    fprintf(fp, "%s\t%s\n", time_buffer, content);
+    fclose(fp);
 }
