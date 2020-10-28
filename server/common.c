@@ -206,14 +206,14 @@ void get_current_time(char time_str[]) {
     time(&timer);
     tblock = gmtime(&timer);
     memset(time_str, 0, strlen(time_str));
-    sprintf(time_str, "%d.%d.%d %d:%d:%d", tblock->tm_year+1900, tblock->tm_mon+1, tblock->tm_mday, tblock->tm_hour+8, tblock->tm_min, tblock->tm_sec);
+    sprintf(time_str, "%04d.%02d.%02d %02d:%02d:%02d", tblock->tm_year+1900, tblock->tm_mon+1, tblock->tm_mday, tblock->tm_hour+8, tblock->tm_min, tblock->tm_sec);
 }
 
 void log_record_start() {
     int ip[4] = { 0 };
     get_local_ip(ip);
     log_record_string("=====================FTP Server start!====================");
-    char buffer[1024];
+    char buffer[BUFFER_LENGTH];
     sprintf(buffer, "Listen Port: %u", config.listen_port);
     log_record_string(buffer);
     sprintf(buffer, "Local IP Address: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);

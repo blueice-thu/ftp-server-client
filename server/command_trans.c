@@ -1,5 +1,30 @@
 #include "command_trans.h"
 
+typedef struct param_buffer {
+    FILE* fp;
+    Session* state;
+}param_buffer;
+
+void _command_retr(void* paras) {
+    param_buffer* para = (param_buffer*)paras;
+    FILE* fp = para->fp;
+    Session* state = para->state;
+    char buffer[BUFFER_LENGTH] = { 0 };
+    while (!feof(fp)) {
+        int read_bytes = fread(buffer, sizeof(char), BUFFER_LENGTH - 1, fp);
+        int send_bytes = send(state->data_trans_fd, buffer, read_bytes, 0);
+        state->trans_file_bytes += send_bytes;
+        state->trans_all_bytes += send_bytes;
+        memset(buffer, 0, BUFFER_LENGTH);
+    }
+
+    state->is_trans_data = 0;
+    fclose(fp); close_trans_conn(state);
+
+    send_message(state, "226 Transfer complete.\r\n");
+    state->trans_file_num += 1;
+}
+
 void command_retr(char* args, Session* state) {
     if (state->is_logged == 0) {
         send_message(state, need_login_msg);
@@ -32,13 +57,40 @@ void command_retr(char* args, Session* state) {
 
     state->is_trans_data = 1;
 
+    pthread_t pid;
+    param_buffer* paras = (param_buffer*)malloc(sizeof(param_buffer));
+    paras->fp = fp;
+    paras->state = state;
+    pthread_create(&pid, NULL, (void*)_command_retr, (void*)paras);
+}
+
+void _command_stor(void* paras) {
+    param_buffer* para = (param_buffer*)paras;
+    FILE* fp = para->fp;
+    Session* state = para->state;
+
     char buffer[BUFFER_LENGTH] = { 0 };
-    while (!feof(fp)) {
-        int read_bytes = fread(buffer, sizeof(char), BUFFER_LENGTH - 1, fp);
-        int send_bytes = send(state->data_trans_fd, buffer, read_bytes, 0);
-        state->trans_file_bytes += send_bytes;
-        state->trans_all_bytes += send_bytes;
+    int recv_length = 0, write_length = 0;
+    state->is_trans_data = 1;
+    recv_length = recv(state->data_trans_fd, buffer, BUFFER_LENGTH, 0);
+    while (recv_length) {
+        if (recv_length < 0) {
+            send_message(state, "426 Data connection error.\r\n");
+            state->is_trans_data = 0;
+            fclose(fp); close_trans_conn(state);
+            return;
+        }
+        state->trans_file_bytes += recv_length;
+        state->trans_all_bytes += recv_length;
+        write_length = fwrite(buffer, sizeof(char), recv_length, fp);
+        if (write_length < recv_length) {
+            state->is_trans_data = 0;
+            send_message(state, "426 Data connection error.\r\n");
+            fclose(fp); close_trans_conn(state);
+            return;
+        }
         memset(buffer, 0, BUFFER_LENGTH);
+        recv_length = recv(state->data_trans_fd, buffer, BUFFER_LENGTH, 0);
     }
 
     state->is_trans_data = 0;
@@ -73,33 +125,9 @@ void command_stor(char* args, Session* state) {
     }
     send_message(state, "150 Opening data connection.\r\n");
 
-    char buffer[BUFFER_LENGTH] = { 0 };
-    int recv_length = 0, write_length = 0;
-    state->is_trans_data = 1;
-    recv_length = recv(state->data_trans_fd, buffer, BUFFER_LENGTH, 0);
-    while (recv_length) {
-        if (recv_length < 0) {
-            send_message(state, "426 Data connection error.\r\n");
-            state->is_trans_data = 0;
-            fclose(fp); close_trans_conn(state);
-            return;
-        }
-        state->trans_file_bytes += recv_length;
-        state->trans_all_bytes += recv_length;
-        write_length = fwrite(buffer, sizeof(char), recv_length, fp);
-        if (write_length < recv_length) {
-            state->is_trans_data = 0;
-            send_message(state, "426 Data connection error.\r\n");
-            fclose(fp); close_trans_conn(state);
-            return;
-        }
-        memset(buffer, 0, BUFFER_LENGTH);
-        recv_length = recv(state->data_trans_fd, buffer, BUFFER_LENGTH, 0);
-    }
-
-    state->is_trans_data = 0;
-    fclose(fp); close_trans_conn(state);
-
-    send_message(state, "226 Transfer complete.\r\n");
-    state->trans_file_num += 1;
+    pthread_t pid;
+    param_buffer* paras = (param_buffer*)malloc(sizeof(param_buffer));
+    paras->fp = fp;
+    paras->state = state;
+    pthread_create(&pid, NULL, (void*)_command_stor, (void*)paras);
 }
